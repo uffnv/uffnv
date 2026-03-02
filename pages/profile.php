@@ -154,21 +154,39 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
     .ban-input { border-radius: 0; border: 2px solid #000; font-weight: bold; font-size: 0.9rem; }
     .ban-input:focus { box-shadow: none; background-color: #fff9c4; }
     .card-header:first-child {border-radius: 0;}
+
+    /* Блок согласия */
+    .consent-toggle-block {
+        background: #f8f9fa;
+        border: 2px dashed #000;
+        padding: 15px;
+        transition: all 0.3s ease;
+    }
+    .consent-toggle-block:hover {
+        background: #fff;
+        border-style: solid;
+        border-color: #bc13fe;
+    }
+    .street-checkbox-switch {
+        width: 45px;
+        height: 22px;
+        cursor: pointer;
+        accent-color: #bc13fe;
+    }
 </style>
 
 <div class="bg-main-anim"></div>
 
 <div class="container py-3 py-md-5" style="position: relative; z-index: 2;">
     
-    <?php if (isset($_GET['msg']) && $_GET['msg'] === 'topic_pending'): ?>
-       <div class="alert alert-warning border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font text-dark">
-            <i class="bi bi-hourglass-split"></i> Тема отправлена на модерацию. Ожидайте одобрения!
-       </div>
+    <?php if (isset($_SESSION['flash'])): ?>
+        <div class="alert alert-<?= $_SESSION['flash_type'] ?> border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font text-dark">
+            <?= $_SESSION['flash']; unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+        </div>
     <?php endif; ?>
 
     <div class="row g-4">
         
-        <!-- === ЛЕВАЯ КОЛОНКА === -->
         <div class="col-12 col-md-4 col-lg-3 order-1">
             <div class="profile-card d-flex flex-column mb-4">
                 <div class="bg-black text-white text-center py-3 street-font border-bottom border-dark">
@@ -195,7 +213,6 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                         <button type="button" class="btn btn-street py-2" data-bs-toggle="modal" data-bs-target="#avatarModal"><?= $avatarUrl ? 'СМЕНИТЬ ФОТО' : 'ЗАГРУЗИТЬ' ?></button>
                     </div>
 
-                    <!-- КНОПКА УДАЛЕНИЯ -->
                     <div class="mt-4 pt-3 border-top border-dark">
                         <button type="button" class="btn btn-outline-danger w-100 rounded-0 street-font border-2 py-2" data-bs-toggle="modal" data-bs-target="#deleteProfileModal">
                             <i class="bi bi-trash3-fill me-1"></i> Удалить аккаунт
@@ -208,7 +225,6 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
             </div>
         </div>
 
-        <!-- === ПРАВАЯ КОЛОНКА === -->
         <div class="col-12 col-md-8 col-lg-9 order-2">
             
             <?php if ($isModerator): ?>
@@ -310,6 +326,21 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                                 <label class="form-label-sm">АДРЕС</label>
                                 <input type="text" name="address" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Улица, дом, кв" value="<?= htmlspecialchars($user['address'] ?? '') ?>">
                             </div>
+
+                            <div class="col-12 mt-4">
+                                <div class="consent-toggle-block d-flex align-items-center justify-content-between gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi bi-cpu fs-3 text-dark"></i>
+                                        <div>
+                                            <label for="data_consent" class="street-font small d-block mb-0" style="cursor: pointer;">Neural_Hub Intelligence</label>
+                                            <p class="small text-muted mb-0 fw-bold" style="font-size: 0.65rem;">Персональный подбор материалов на основе твоих интересов</p>
+                                        </div>
+                                    </div>
+                                    <div class="form-check form-switch p-0 m-0">
+                                        <input class="form-check-input street-checkbox-switch" type="checkbox" name="data_consent" id="data_consent" <?= (isset($user['data_consent']) && $user['data_consent'] ? 'checked' : '') ?>>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -382,7 +413,6 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
 
 <div class="modal fade" id="avatarModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-3 border-dark rounded-0"><div class="modal-header bg-warning border-bottom border-dark py-2"><h6 class="modal-title street-font">АВАТАР</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-3"><form action="/actions/upload_avatar.php" method="POST" enctype="multipart/form-data"><input type="file" name="avatar" class="form-control form-control-sm mb-3 border-dark rounded-0" required accept="image/*"><button type="submit" class="btn btn-street w-100 btn-sm">ЗАГРУЗИТЬ</button></form></div></div></div></div>
 
-<!-- ОБНОВЛЕННОЕ МОДАЛЬНОЕ ОКНО СОХРАНЕНИЯ (С ПОДСКАЗКАМИ) -->
 <div class="modal fade" id="passwordConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-3 border-dark rounded-0">
@@ -471,4 +501,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
-    
