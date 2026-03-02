@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UFFNV STORE</title>
     
-    <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     
-    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <style>
@@ -98,23 +96,10 @@
         }
         .cart-badge.bg-danger { background-color: #dc3545 !important; color: #fff; border-color: #fff; }
 
-        /* ГАМБУРГЕР */
-        .navbar-toggler { border: 2px solid var(--street-yellow) !important; border-radius: 0; padding: 4px; background: #000; }
-        .navbar-toggler i { color: var(--street-yellow); }
-        .navbar-toggler:focus { box-shadow: 0 0 10px var(--street-yellow); }
-
         /* УВЕДОМЛЕНИЯ */
         .notif-dropdown-menu {
             width: 320px; padding: 0; border: 2px solid var(--street-yellow); border-radius: 0;
             margin-top: 15px !important; box-shadow: 0 10px 30px rgba(0,0,0,1); background: #1a1a1a;
-        }
-        .notif-dropdown-menu::before {
-            content: ''; position: absolute; top: -10px; right: 15px;
-            border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 10px solid var(--street-yellow);
-        }
-        .notif-header {
-            background: var(--street-yellow); color: #000; padding: 10px 15px;
-            font-weight: 900; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid #000;
         }
         .notif-item {
             padding: 12px; border-bottom: 1px solid #333; color: #fff; text-decoration: none;
@@ -122,19 +107,38 @@
         }
         .notif-item:hover { background: #333; color: var(--street-yellow); padding-left: 18px; }
         .notif-item.unread { background: #2a2a2a; border-left: 4px solid var(--street-yellow); }
-        .notif-item.unread::after {
-            content: ''; position: absolute; top: 12px; right: 12px;
-            width: 8px; height: 8px; background: #dc3545; border-radius: 50%;
+
+        /* === СТИЛИ ДЛЯ БЛОКИРОВКИ (STREET LOCK) === */
+        .maintenance-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(18, 0, 36, 0.98);
+            z-index: 10000; display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px); pointer-events: all;
         }
-        .notif-footer { background: #000; padding: 10px; text-align: center; border-top: 1px solid var(--street-yellow); }
-        .notif-footer a { color: var(--street-yellow); text-decoration: none; font-weight: 900; text-transform: uppercase; font-size: 0.75rem; }
-        .street-header .dropdown-menu { border-radius: 0; }
+        .lock-card {
+            background: #fff; border: 5px solid #000; padding: 40px;
+            max-width: 500px; width: 90%; text-align: center;
+            box-shadow: 20px 20px 0 var(--street-yellow); transform: rotate(-1deg);
+        }
+        .lock-card h1 { font-family: 'Impact', sans-serif; font-size: 3rem; color: #000; margin-bottom: 10px; }
+        .lock-card p { font-weight: 900; text-transform: uppercase; color: #333; line-height: 1.2; }
+        .lock-tape {
+            background: var(--street-yellow); color: #000; padding: 5px 20px;
+            font-weight: 900; transform: rotate(2deg) translateY(-10px);
+            display: inline-block; margin-bottom: 20px; border: 2px solid #000;
+        }
+        .btn-back-home {
+            background: #000; color: var(--street-yellow); border: none;
+            padding: 12px 30px; font-weight: 900; text-transform: uppercase;
+            margin-top: 25px; transition: 0.2s; text-decoration: none; display: inline-block;
+        }
+        .btn-back-home:hover { background: var(--street-yellow); color: #000; transform: scale(1.1); }
     </style>
 </head>
 <body>
 
 <?php
-// Подсчет товаров
+// Подсчет товаров в корзине
 $cartCount = 0;
 if (isset($_SESSION['cart'])) { foreach ($_SESSION['cart'] as $qty) $cartCount += $qty; }
 
@@ -149,18 +153,42 @@ if (isset($_SESSION['user_id'])) {
     $stmt->execute([$_SESSION['user_id']]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+// Определение текущей страницы и логика блокировки
 $curPage = basename($_SERVER['PHP_SELF']);
+
+$inactivePages = [
+    'catalog.php',
+    'delivery.php',
+    'product.php',
+    'cart.php',
+    'checkout.php',
+    'about.php',
+    'contacts.php'
+];
+
+$isPageLocked = in_array($curPage, $inactivePages);
 ?>
+
+<?php if ($isPageLocked): ?>
+    <div class="maintenance-overlay">
+        <div class="lock-card">
+            <div class="lock-tape">UNDER CONSTRUCTION</div>
+            <h1>CLOSED<span>.</span></h1>
+            <p>Этот район временно перекрыт. <br> Мы обновляем ассортимент и настраиваем логистику.</p>
+            <p class="mt-2" style="color: #bc13fe; font-size: 0.8rem;">[ ERROR_CODE: SECTION_INACTIVE ]</p>
+            <a href="/" class="btn-back-home">На главную</a>
+        </div>
+    </div>
+<?php endif; ?>
 
 <header class="street-header fade-in-down">
     <div class="container">
         <nav class="navbar navbar-expand-lg p-0">
-            <!-- ЛОГОТИП -->
             <a class="header-logo-sticker me-lg-4" href="/">
                 <h2 class="header-logo-text">UFFNV<span>.</span></h2>
             </a>
 
-            <!-- МОБИЛЬНЫЕ КНОПКИ -->
             <div class="d-flex d-lg-none align-items-center gap-2">
                 <a href="/pages/cart.php" class="btn-icon-street position-relative" style="margin-left:0;">
                     <i class="bi bi-bag-fill"></i>
@@ -171,7 +199,6 @@ $curPage = basename($_SERVER['PHP_SELF']);
                 </button>
             </div>
 
-            <!-- МЕНЮ -->
             <div class="collapse navbar-collapse mt-3 mt-lg-0" id="navbarNav">
                 <ul class="navbar-nav me-auto align-items-lg-center">
                     <li class="nav-item"><a class="nav-link-street <?= ($curPage == 'index.php') ? 'active' : '' ?>" href="/">Главная</a></li>
@@ -184,7 +211,6 @@ $curPage = basename($_SERVER['PHP_SELF']);
                     </li>
                 </ul>
 
-                <!-- ДЕСКТОПНЫЕ ИКОНКИ -->
                 <div class="d-none d-lg-flex align-items-center">
                     <?php if(isset($_SESSION['user_id'])): ?>
                         <div class="dropdown">
@@ -193,7 +219,7 @@ $curPage = basename($_SERVER['PHP_SELF']);
                                 <?php if($notifCount > 0): ?><span class="cart-badge bg-danger"><?= $notifCount ?></span><?php endif; ?>
                             </a>
                             <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu">
-                                <div class="notif-header d-flex justify-content-between">
+                                <div class="notif-header d-flex justify-content-between" style="background: var(--street-yellow); color: #000; padding: 10px 15px; font-weight: 900; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid #000;">
                                     <span>События</span>
                                     <?php if($notifCount > 0): ?><span class="badge bg-danger rounded-0"><?= $notifCount ?> новых</span><?php endif; ?>
                                 </div>
@@ -209,7 +235,7 @@ $curPage = basename($_SERVER['PHP_SELF']);
                                         </a>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
-                                <div class="notif-footer"><a href="/pages/notifications.php">Все уведомления →</a></div>
+                                <div class="notif-footer" style="background: #000; padding: 10px; text-align: center; border-top: 1px solid var(--street-yellow);"><a href="/pages/notifications.php" style="color: var(--street-yellow); text-decoration: none; font-weight: 900; text-transform: uppercase; font-size: 0.75rem;">Все уведомления →</a></div>
                             </div>
                         </div>
                         <a href="/pages/profile.php" class="btn-icon-street" title="Профиль"><i class="bi bi-person-fill"></i></a>
@@ -222,7 +248,6 @@ $curPage = basename($_SERVER['PHP_SELF']);
                     </a>
                 </div>
                 
-                <!-- МОБИЛЬНОЕ МЕНЮ (СПИСОК) -->
                 <div class="d-lg-none mt-3 border-top border-secondary pt-3">
                     <?php if(isset($_SESSION['user_id'])): ?>
                         <a href="/pages/notifications.php" class="nav-link-street mb-2">
