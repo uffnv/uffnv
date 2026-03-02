@@ -174,7 +174,7 @@ echo str_replace('"assets/', '"../assets/', $headerContent);
     <?php endif; ?>
 
     <!-- 2. БАЗА ЗНАНИЙ -->
-   <?php if (!empty($recData['external_intel'])): ?>
+    <?php if (!empty($recData['external_intel'])): ?>
     <div class="mb-5">
         <div class="section-header" style="border-color: #bc13fe;" data-aos="fade-right">
             <h2 class="street-font text-white mb-0 fs-3">ВНЕШНИЙ ИНТЕЛЛЕКТ</h2>
@@ -261,4 +261,3 @@ include '../includes/footer.php';
 $footerContent = ob_get_clean();
 echo str_replace('"assets/', '"../assets/', $footerContent);
 ?>
-
