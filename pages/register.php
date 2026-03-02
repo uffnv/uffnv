@@ -84,6 +84,7 @@ unset($_SESSION['errors'], $_SESSION['old']);
         transition: all 0.2s;
         background: #f8f9fa;
         color: #000;
+        width: 100%;
     }
     .street-input:focus {
         background-color: #fff;
@@ -126,18 +127,32 @@ unset($_SESSION['errors'], $_SESSION['old']);
         border: 2px solid #000;
         box-shadow: 3px 3px 0 #000;
     }
-        .tape-strip {
+    .tape-strip {
         position: absolute; top: -15px; left: 50%; transform: translateX(-50%) rotate(-2deg);
         width: 140px; height: 40px;
-        background: rgba(255, 255, 255, 0.4);
+        background-color: #FCE300;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         z-index: 10;
         border-left: 2px dotted rgba(0,0,0,0.2);
         border-right: 2px dotted rgba(0,0,0,0.2);
-        background-color: #FCE300;
         opacity: 0.9;
     }
-    /* Анимация появления */
+
+    /* === БЛОК СОГЛАСИЯ === */
+    .consent-block {
+        background: #f0f0f0;
+        border: 2px dashed #000;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+    .street-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #bc13fe;
+        margin-top: 2px;
+    }
+
     .fade-in-up {
         animation: fadeInUp 0.6s ease-out forwards;
         opacity: 0;
@@ -148,79 +163,71 @@ unset($_SESSION['errors'], $_SESSION['old']);
     }
 </style>
 
-<!-- ФОН -->
 <div class="bg-main-anim"></div>
 
 <div class="auth-container">
     <div class="auth-card fade-in-up">
-        
-            <div class="tape-strip"></div>
-
-        <!-- ЗАГОЛОВОК -->
+        <div class="tape-strip"></div>
         <div class="auth-header">
             <span>НОВЫЙ ИГРОК</span>
         </div>
 
         <div class="p-4 p-md-5">
-            
             <form method="POST" action="/actions/signup.php" novalidate>
                 
-                <!-- ИМЯ     -->
                 <div class="mb-3">
                     <label class="street-label">Никнейм</label>
                     <input type="text" name="username" 
                            class="form-control street-input <?= isset($errors['username']) ? 'is-invalid' : '' ?>" 
                            placeholder="Придумай имя"
                            value="<?= htmlspecialchars($old['username'] ?? '') ?>">
-                    
                     <?php if (isset($errors['username'])): ?>
                         <div class="street-error"><?= $errors['username'] ?></div>
                     <?php endif; ?>
                 </div>
 
-                <!-- EMAIL -->
                 <div class="mb-3">
                     <label class="street-label">Email</label>
                     <input type="email" name="email" 
                            class="form-control street-input <?= isset($errors['email']) ? 'is-invalid' : '' ?>" 
                            placeholder="name@example.com"
                            value="<?= htmlspecialchars($old['email'] ?? '') ?>">
-                    
                     <?php if (isset($errors['email'])): ?>
                         <div class="street-error"><?= $errors['email'] ?></div>
                     <?php endif; ?>
                 </div>
 
-                <!-- ПАРОЛЬ -->
                 <div class="mb-3">
                     <label class="street-label">Пароль</label>
                     <input type="password" name="password" 
                            class="form-control street-input <?= isset($errors['password']) ? 'is-invalid' : '' ?>"
                            placeholder="Минимум 6 символов">
-                    
                     <?php if (isset($errors['password'])): ?>
                         <div class="street-error"><?= $errors['password'] ?></div>
                     <?php endif; ?>
                 </div>
 
-                <!-- ПОВТОР ПАРОЛЯ -->
                 <div class="mb-4">
                     <label class="street-label">Подтверждение</label>
                     <input type="password" name="password_confirm" 
                            class="form-control street-input <?= isset($errors['password_confirm']) ? 'is-invalid' : '' ?>"
                            placeholder="Повтори пароль">
-                    
                     <?php if (isset($errors['password_confirm'])): ?>
                         <div class="street-error"><?= $errors['password_confirm'] ?></div>
                     <?php endif; ?>
                 </div>
-                
-                <!-- КНОПКА -->
+
+                <div class="consent-block d-flex align-items-start gap-2">
+                    <input type="checkbox" name="data_consent" id="data_consent" class="street-checkbox" required>
+                    <label for="data_consent" class="small fw-bold text-dark text-uppercase" style="font-size: 0.65rem; line-height: 1.2;">
+                        Я разрешаю системе анализировать мои действия и интересы для работы персонального Neural_Hub.
+                    </label>
+                </div>
+
                 <button type="submit" class="street-btn">
                     ЗАРЕГИСТРИРОВАТЬСЯ
                 </button>
                 
-                <!-- ССЫЛКА НА ВХОД -->
                 <div class="text-center mt-4 pt-3 border-top border-dark">
                     <span class="small fw-bold text-muted text-uppercase">Уже в игре?</span><br>
                     <a href="/pages/login.php" class="text-decoration-none fw-black text-dark fs-5" style="border-bottom: 3px solid #FCE300; box-shadow: inset 0 -5px 0 rgba(252, 227, 0, 0.3);">
@@ -228,7 +235,6 @@ unset($_SESSION['errors'], $_SESSION['old']);
                     </a>
                 </div>
             </form>
-
         </div>
     </div>
 </div>
