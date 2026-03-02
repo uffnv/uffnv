@@ -1,12 +1,9 @@
-<!-- includes/footer.php -->
-
 <?php
 if (!isset($curPage)) {
     $curPage = basename($_SERVER['PHP_SELF']);
 }
 ?>
 
-<!-- Отступ, чтобы контент не прилипал -->
 <div style="margin-top: 100px;"></div>
 
 <style>
@@ -74,7 +71,7 @@ if (!isset($curPage)) {
     /* ССЫЛКИ НАВИГАЦИИ */
     .footer-link {
         text-decoration: none; 
-        color: #e0e0e0; /* Светло-серый для контраста */
+        color: #e0e0e0; 
         font-weight: 700; 
         font-size: 0.95rem;
         display: block; 
@@ -86,7 +83,6 @@ if (!isset($curPage)) {
         letter-spacing: 0.5px;
     }
     
-    /* Ховер и Активное состояние */
     .footer-link:hover, .footer-link.active {
         color: #000 !important; 
         background-color: var(--street-yellow);
@@ -96,7 +92,6 @@ if (!isset($curPage)) {
         box-shadow: 5px 5px 0 #000;
     }
     
-    /* Спец-стиль для SALE */
     .footer-link.text-danger { color: #ff6b6b; }
     .footer-link.text-danger:hover, .footer-link.text-danger.active {
         background-color: #dc3545; color: #fff !important;
@@ -150,6 +145,7 @@ if (!isset($curPage)) {
         text-decoration: none;
         letter-spacing: -0.5px;
         transition: color 0.2s;
+        word-break: break-all;
     }
     .footer-phone:hover { color: var(--street-yellow); }
 
@@ -173,7 +169,6 @@ if (!isset($curPage)) {
     <div class="container">
         <div class="row gy-5">
             
-            <!-- 1. БРЕНД -->
             <div class="col-lg-4 col-md-12">
                 <a href="/" class="footer-logo-box">
                     <h2 class="footer-logo-text">UFFNV<span>.</span></h2>
@@ -185,13 +180,10 @@ if (!isset($curPage)) {
                 </p>
                 
                 <div class="d-flex">
-                    <a href="#" class="social-btn"><i class="bi bi-telegram"></i></a>
-                    <a href="#" class="social-btn"><i class="bi bi-youtube"></i></a>
-                    <a href="#" class="social-btn fw-black" style="font-size: 0.9rem; font-weight: 900;">VK</a>
+                    <a href="https://t.me/uffn_v" class="social-btn"><i class="bi bi-telegram"></i></a>
                 </div>
             </div>
 
-            <!-- 2. КАТАЛОГ -->
             <div class="col-lg-2 col-md-4 col-6">
                 <div class="footer-header">КАТАЛОГ</div>
                 <nav class="d-flex flex-column">
@@ -210,7 +202,6 @@ if (!isset($curPage)) {
                 </nav>
             </div>
 
-            <!-- 3. ИНФО -->
             <div class="col-lg-2 col-md-4 col-6">
                 <div class="footer-header">ИНФО</div>
                 <nav class="d-flex flex-column">
@@ -229,24 +220,23 @@ if (!isset($curPage)) {
                 </nav>
             </div>
 
-            <!-- 4. СВЯЗЬ -->
             <div class="col-lg-4 col-md-4">
                 <div class="footer-header">СВЯЗЬ</div>
                 
                 <div class="mb-4">
                     <span class="footer-label">Где нас найти:</span>
-                    <span class="footer-value">г. Москва, ул. Уличная 13</span>
+                    <span class="footer-value">Пока что нигде, увы :(</span>
                 </div>
 
                 <div class="mb-4">
-                    <span class="footer-label">Звони:</span>
-                    <a href="tel:+79990000000" class="footer-phone">
-                        +7 (999) 000-00-00
+                    <span class="footer-label">Пиши нам:</span>
+                    <a href="mailto:admin@uffnv.ru" class="footer-phone">
+                        admin@uffnv.ru
                     </a>
                 </div>
 
                 <div>
-                    <a href="mailto:support@uffn.ru" class="btn btn-warning w-100 w-md-auto rounded-0 fw-black px-4 py-3 border-2 border-white text-dark shadow-sm fw-bold text-uppercase">
+                    <a href="mailto:admin@uffnv.ru" class="btn btn-warning w-100 w-md-auto rounded-0 fw-black px-4 py-3 border-2 border-white text-dark shadow-sm fw-bold text-uppercase">
                         <i class="bi bi-envelope-fill me-2"></i> НАПИСАТЬ НАМ
                     </a>
                 </div>
@@ -256,14 +246,12 @@ if (!isset($curPage)) {
     </div>
 </footer>
 
-<!-- НИЖНЯЯ ПОЛОСА -->
 <div class="footer-bottom">
     <div class="container">
-        &copy; 2024 - <?= date('Y') ?> UFFNV STORE. MADE ON THE STREETS.
+        &copy; <?= date('Y') ?> UFFNV. MADE ON THE STREETS.
     </div>
 </div>
 
-<!-- SCRIPTS (Оставляем как есть, для работы функционала) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
