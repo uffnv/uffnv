@@ -174,23 +174,26 @@ echo str_replace('"assets/', '"../assets/', $headerContent);
     <?php endif; ?>
 
     <!-- 2. БАЗА ЗНАНИЙ -->
-    <?php if (!empty($recMaterials)): ?>
+   <?php if (!empty($recData['external_intel'])): ?>
     <div class="mb-5">
         <div class="section-header" style="border-color: #bc13fe;" data-aos="fade-right">
-            <h2 class="street-font text-white mb-0 fs-3">АПГРЕЙД НАВЫКОВ</h2>
-            <div class="mono-font small" style="color: #bc13fe;">> SKILL_DATABASE_ACCESS</div>
+            <h2 class="street-font text-white mb-0 fs-3">ВНЕШНИЙ ИНТЕЛЛЕКТ</h2>
+            <div class="mono-font small" style="color: #bc13fe;">> CRAWLING_OPEN_SOURCES... [SUCCESS]</div>
         </div>
         <div class="row g-4">
-            <?php foreach ($recMaterials as $material): ?>
+            <?php foreach ($recData['external_intel'] as $link): ?>
             <div class="col-md-6" data-aos="flip-up">
-                <div class="material-card h-100 p-4 position-relative">
-                    <i class="bi bi-chip position-absolute top-0 end-0 m-3 fs-3 text-white-50"></i>
-                    <h4 class="text-white street-font mb-3"><?= htmlspecialchars($material['title']) ?></h4>
-                    <p class="text-secondary small mb-4 mono-font" style="min-height: 40px;">
-                        <?= htmlspecialchars($material['description']) ?>
+                <div class="material-card h-100 p-4 position-relative" style="background: linear-gradient(135deg, #0d0d0d 0%, #1a002a 100%);">
+                    <div class="position-absolute top-0 end-0 m-3 mono-font text-white-50 small" style="font-size: 0.6rem; opacity: 0.3;">
+                        SRC_REMOTE: <?= parse_url($link['url'], PHP_URL_HOST) ?>
+                    </div>
+                    <i class="bi bi-broadcast position-absolute top-0 end-0 m-3 fs-4" style="color: #bc13fe; margin-top: 25px !important;"></i>
+                    <h4 class="text-white street-font mb-2" style="letter-spacing: 1px;"><?= htmlspecialchars($link['title']) ?></h4>
+                    <p class="text-secondary small mb-4 mono-font">
+                        <?= htmlspecialchars($link['desc']) ?>
                     </p>
-                    <a href="<?= htmlspecialchars($material['content_url']) ?>" class="text-decoration-none text-white fw-bold small mono-font">
-                        <i class="bi bi-download me-2"></i> ЗАГРУЗИТЬ ДАННЫЕ
+                    <a href="<?= htmlspecialchars($link['url']) ?>" target="_blank" class="text-decoration-none fw-bold small mono-font" style="color: #bc13fe;">
+                        <span class="border border-secondary px-2 py-1">OPEN_CONNECTION_URL</span>
                     </a>
                 </div>
             </div>
@@ -258,3 +261,4 @@ include '../includes/footer.php';
 $footerContent = ob_get_clean();
 echo str_replace('"assets/', '"../assets/', $footerContent);
 ?>
+
