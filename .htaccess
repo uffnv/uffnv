@@ -1,13 +1,11 @@
-# Основные настройки
+# 1. Запрет листинга содержимого каталогов
 Options -Indexes
 DirectoryIndex index.php index.html
 
-# Разрешить доступ к статике и скриптам сайта
-<FilesMatch "\.(php|css|js|png|jpg|jpeg|gif|svg|ico|webp|jfif|woff|woff2|ttf|eot)$">
-    Require all granted
-</FilesMatch>
+# 2. Разрешить доступ к страницам и статике сайта
+Require all granted
 
-# Защита конфигов, секретов, дампов и служебных файлов
+# 3. Защита конфигов, секретов, дампов и служебных файлов
 <FilesMatch "(^#.*#|\.(bak|conf|dist|fla|in[ci]|log|psd|sh|sql|sw[op]|env|envrc|git.*|zip)|~)$">
     Require all denied
 </FilesMatch>
@@ -20,17 +18,9 @@ DirectoryIndex index.php index.html
     Require all denied
 </Files>
 
-# HTTP Security Headers
+# 4. HTTP Security Headers
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
-
-# Запрет листинга служебных папок без указания конкретного файла
-RedirectMatch 403 ^/pages/?$
-RedirectMatch 403 ^/actions/?$
-RedirectMatch 403 ^/includes/?$
-RedirectMatch 403 ^/config/?$
-RedirectMatch 403 ^/admin/?$
