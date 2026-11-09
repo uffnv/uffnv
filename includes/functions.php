@@ -13,7 +13,7 @@ function clean($data) {
  */
 function checkAuth() {
     if (!isset($_SESSION['user_id'])) {
-        header("Location: index.php?page=login");
+        header("Location: /pages/login.php");
         exit;
     }
 }

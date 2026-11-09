@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // pages/register.php
 session_start();
 require_once __DIR__ . '/../includes/header.php';
@@ -217,11 +217,21 @@ unset($_SESSION['errors'], $_SESSION['old']);
                     <?php endif; ?>
                 </div>
 
-                <div class="consent-block d-flex align-items-start gap-2">
-                    <input type="checkbox" name="data_consent" id="data_consent" class="street-checkbox" required>
-                    <label for="data_consent" class="small fw-bold text-dark text-uppercase" style="font-size: 0.65rem; line-height: 1.2;">
-                        Я разрешаю системе анализировать мои действия и интересы для работы персонального Neural_Hub.
-                    </label>
+                <div class="consent-block d-flex flex-column gap-2">
+                    <div class="d-flex align-items-start gap-2">
+                        <input type="checkbox" name="data_consent" id="data_consent" class="street-checkbox" required>
+                        <label for="data_consent" class="small fw-bold text-dark text-uppercase" style="font-size: 0.7rem; line-height: 1.3;">
+                            Я даю согласие на обработку персональных данных в соответствии с 
+                            <a href="/pages/privacy.php" target="_blank" class="text-dark text-decoration-underline fw-black">Политикой конфиденциальности (152-ФЗ)</a> 
+                            и принимаю условия <a href="/pages/terms.php" target="_blank" class="text-dark text-decoration-underline fw-black">Пользовательского соглашения</a>.
+                        </label>
+                    </div>
+                    <div class="d-flex align-items-start gap-2 mt-1">
+                        <input type="checkbox" name="promo_consent" id="promo_consent" class="street-checkbox">
+                        <label for="promo_consent" class="small text-muted text-uppercase" style="font-size: 0.65rem; line-height: 1.2;">
+                            Получать уведомления о дропах, релизах и закрытых акциях UFFNV (38-ФЗ)
+                        </label>
+                    </div>
                 </div>
 
                 <button type="submit" class="street-btn">

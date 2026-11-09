@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // pages/checkout.php
 session_start();
 require_once __DIR__ . '/../config/db.php';
@@ -313,12 +313,23 @@ if (isset($_SESSION['user_id'])) {
                         <span class="h3 street-font text-street-yellow m-0"><?= number_format($total, 0, '', ' ') ?> ₽</span>
                     </div>
 
+                    <div class="mb-3 p-3 bg-dark border border-secondary text-start small">
+                        <div class="form-check">
+                            <input class="form-check-input rounded-0" type="checkbox" id="checkout_pd_consent" name="checkout_pd_consent" required checked style="accent-color: #FCE300;">
+                            <label class="form-check-label text-white-50" for="checkout_pd_consent" style="font-size: 0.75rem;">
+                                Я согласен на обработку персональных данных в соответствии с 
+                                <a href="/pages/privacy.php" target="_blank" class="text-street-yellow text-decoration-underline fw-bold">152-ФЗ</a> 
+                                и принимаю условия <a href="/pages/terms.php" target="_blank" class="text-street-yellow text-decoration-underline fw-bold">Публичной оферты</a>.
+                            </label>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn btn-confirm w-100 rounded-0 text-uppercase py-4 fs-4 shadow-sm">
                         ПОДТВЕРДИТЬ ЗАКАЗ
                     </button>
                     
-                    <div class="mt-3 text-center small text-white-50 fw-bold lh-sm">
-                        Нажимая кнопку, вы соглашаетесь с условиями уличного кодекса и обработки данных.
+                    <div class="mt-3 text-center small text-white-50 fw-bold lh-sm" style="font-size: 0.75rem;">
+                        Оформляя заказ, вы подтверждаете согласие с <a href="/pages/terms.php" target="_blank" class="text-street-yellow">условиями продажи</a> и <a href="/pages/privacy.php" target="_blank" class="text-street-yellow">обработки данных</a> (152-ФЗ РФ).
                     </div>
                 </div>
             </div>

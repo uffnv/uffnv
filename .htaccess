@@ -1,0 +1,36 @@
+# Основные настройки
+Options -Indexes
+DirectoryIndex index.php index.html
+
+# Разрешить доступ к статике и скриптам сайта
+<FilesMatch "\.(php|css|js|png|jpg|jpeg|gif|svg|ico|webp|jfif|woff|woff2|ttf|eot)$">
+    Require all granted
+</FilesMatch>
+
+# Защита конфигов, секретов, дампов и служебных файлов
+<FilesMatch "(^#.*#|\.(bak|conf|dist|fla|in[ci]|log|psd|sh|sql|sw[op]|env|envrc|git.*|zip)|~)$">
+    Require all denied
+</FilesMatch>
+
+<Files "db.local.php">
+    Require all denied
+</Files>
+
+<Files "db.php">
+    Require all denied
+</Files>
+
+# HTTP Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Запрет листинга служебных папок без указания конкретного файла
+RedirectMatch 403 ^/pages/?$
+RedirectMatch 403 ^/actions/?$
+RedirectMatch 403 ^/includes/?$
+RedirectMatch 403 ^/config/?$
+RedirectMatch 403 ^/admin/?$

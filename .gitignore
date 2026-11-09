@@ -1,0 +1,23 @@
+# Local configuration (secrets, DB credentials)
+config/db.local.php
+.env
+.env.*
+.envrc
+
+# Archives and dumps
+uffnv-main.zip
+*.zip
+*.tar.gz
+*.sql
+*.sql.gz
+
+# Logs & temp
+*.log
+/logs/
+/temp/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
