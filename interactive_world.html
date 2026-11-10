@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT: UFFNV // The Operator's Realm</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&display=swap');
+    * {
+      font-family: 'JetBrains Mono', monospace, -apple-system, sans-serif;
+      user-select: none;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #08090c;
+      color: #e2e8f0;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    /* Scanlines effect */
+    .scanlines::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 20;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .crt-glow {
+      text-shadow: 0 0 10px rgba(0, 255, 204, 0.6), 0 0 20px rgba(0, 255, 204, 0.3);
+    }
+    .amber-glow {
+      text-shadow: 0 0 10px rgba(255, 170, 0, 0.7), 0 0 20px rgba(255, 110, 0, 0.4);
+    }
+    .pink-glow {
+      text-shadow: 0 0 10px rgba(255, 0, 128, 0.7), 0 0 20px rgba(255, 0, 128, 0.4);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col scanlines relative bg-[#06080d]">
+
+  <!-- Top Navigation & System Bar -->
+  <header class="h-14 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur px-4 flex items-center justify-between z-30 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
+      <div class="flex flex-col">
+        <span class="font-extrabold text-sm tracking-wider text-emerald-400 crt-glow">PROJECT // UFFNV: OPERATOR</span>
+        <span class="text-[10px] text-slate-400 font-mono tracking-widest uppercase" id="zone-subtitle">ZONE 01: STREET & CONCRETE</span>
+      </div>
+    </div>
+
+    <!-- Realm Switcher Buttons -->
+    <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 text-xs">
+      <button onclick="switchZone(0)" id="zone-btn-0" class="px-3 py-1 rounded font-medium transition-all bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+        1. Стрит-Арт & Ночь
+      </button>
+      <button onclick="switchZone(1)" id="zone-btn-1" class="px-3 py-1 rounded font-medium transition-all text-slate-400 hover:text-amber-300 hover:bg-slate-800">
+        2. Территория Тепла
+      </button>
+      <button onclick="switchZone(2)" id="zone-btn-2" class="px-3 py-1 rounded font-medium transition-all text-slate-400 hover:text-cyan-300 hover:bg-slate-800">
+        3. TouchDesigner Synth
+      </button>
+      <button onclick="switchZone(3)" id="zone-btn-3" class="px-3 py-1 rounded font-medium transition-all text-slate-400 hover:text-purple-300 hover:bg-slate-800">
+        4. Убежище 12:00
+      </button>
+    </div>
+
+    <!-- Right utility controls -->
+    <div class="flex items-center gap-2">
+      <!-- Audio Synth Toggle -->
+      <button id="audio-toggle-btn" onclick="toggleAudio()" class="flex items-center gap-2 px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 transition-all">
+        <span id="audio-indicator" class="w-2 h-2 rounded-full bg-red-500"></span>
+        <span id="audio-text">Звук: OFF</span>
+      </button>
+
+      <!-- Help / Guide button -->
+      <button onclick="toggleModal('modal-help')" class="p-1.5 px-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-slate-300">
+        ? Управление
+      </button>
+      <button onclick="toggleModal('modal-manifesto')" class="p-1.5 px-2.5 bg-emerald-950/60 border border-emerald-700/50 hover:bg-emerald-900/60 rounded text-xs text-emerald-300">
+        Манифест
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Game Canvas Container -->
+  <main class="flex-1 relative w-full h-full overflow-hidden">
+    <canvas id="gameCanvas" class="block w-full h-full cursor-crosshair"></canvas>
+
+    <!-- In-Game Interactive HUD Overlay -->
+    <div class="absolute bottom-4 left-4 z-20 flex flex-col gap-2 pointer-events-none">
+      <div class="bg-slate-950/80 border border-slate-800 p-3 rounded-lg backdrop-blur pointer-events-auto max-w-sm text-xs">
+        <div class="flex justify-between items-center text-slate-400 mb-1 border-b border-slate-800/80 pb-1">
+          <span class="font-bold text-slate-200 uppercase" id="hud-title">Стрит & Граффити</span>
+          <span class="text-[10px] text-emerald-400" id="hud-stat">Кэп: Montana Fat</span>
+        </div>
+        <p class="text-slate-300 text-[11px] leading-relaxed" id="hud-desc">
+          Бегай по бетонным блокам. <b>Зажимай ЛКМ</b> для нанесения тегов на стены аэрозольным баллоном. Исследуй осколки мыслей.
+        </p>
+        <div class="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+          <span>[A / D] или [← / →] Движение</span>
+          <span>[W / Space] Прыжок</span>
+          <span>[E] Действие</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Dialog / Thought Log Box -->
+    <div id="thought-box" class="hidden absolute top-6 left-1/2 -translate-x-1/2 z-30 max-w-xl w-full px-4 pointer-events-none transition-all duration-300">
+      <div class="bg-slate-950/95 border-2 border-emerald-500/60 shadow-2xl shadow-emerald-500/10 p-4 rounded-xl backdrop-blur text-sm pointer-events-auto">
+        <div class="flex items-center justify-between text-emerald-400 font-bold mb-1.5 text-xs">
+          <span id="thought-author" class="tracking-wide uppercase crt-glow">ЗАПИСЬ ИЗ ПАМЯТИ // 02_РАЗМЫШЛЕНИЯ</span>
+          <button onclick="closeThought()" class="text-slate-400 hover:text-white px-2 py-0.5 rounded text-xs bg-slate-900 border border-slate-800">ESC ✕</button>
+        </div>
+        <div id="thought-text" class="text-slate-200 text-xs leading-relaxed italic border-l-2 border-emerald-500/80 pl-3 my-2 font-mono">
+          «Свобода. Из свободы можно получить стабильность и смысл — без нареканий совести...»
+        </div>
+        <div class="text-[10px] text-slate-400 text-right">Нажмите ESC или кликните крестик, чтобы закрыть</div>
+      </div>
+    </div>
+
+    <!-- Quick Tool Palette for Zone 0 (Graffiti) -->
+    <div id="graffiti-toolbar" class="absolute top-4 right-4 z-20 flex flex-col gap-1.5 bg-slate-950/80 border border-slate-800 p-2 rounded-lg backdrop-blur">
+      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">Краска</span>
+      <div class="flex gap-1">
+        <button onclick="setSprayColor('#00ffcc')" class="w-6 h-6 rounded bg-[#00ffcc] border border-white/40 hover:scale-110 transition-transform" title="Cyber Cyan"></button>
+        <button onclick="setSprayColor('#ff007f')" class="w-6 h-6 rounded bg-[#ff007f] border border-white/40 hover:scale-110 transition-transform" title="Acid Pink"></button>
+        <button onclick="setSprayColor('#ffaa00')" class="w-6 h-6 rounded bg-[#ffaa00] border border-white/40 hover:scale-110 transition-transform" title="Industrial Amber"></button>
+        <button onclick="setSprayColor('#ffffff')" class="w-6 h-6 rounded bg-[#ffffff] border border-white/40 hover:scale-110 transition-transform" title="Pure Chrome"></button>
+        <button onclick="setSprayColor('#101216')" class="w-6 h-6 rounded bg-[#101216] border border-slate-600 hover:scale-110 transition-transform" title="Bitumen Black"></button>
+      </div>
+      <button onclick="clearGraffiti()" class="text-[10px] mt-1 py-0.5 px-2 bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-400 rounded border border-slate-800">
+        Смыть теги
+      </button>
+    </div>
+
+    <!-- Zone 2 (Wave Synth) TouchDesigner Controls HUD -->
+    <div id="wavesynth-toolbar" class="hidden absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-950/85 border border-cyan-500/40 p-3 rounded-lg backdrop-blur max-w-xs text-xs">
+      <div class="flex items-center justify-between text-cyan-400 font-bold text-[11px] border-b border-cyan-500/30 pb-1">
+        <span>TOUCHDESIGNER // MEDIAPIPE</span>
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+      </div>
+      <div class="text-[10px] text-slate-300 leading-tight">
+        <b>Кончики 10 пальцев</b> отслеживаются в пространстве. Кликай или води курсором, чтобы создавать гармонические интерференционные волны.
+      </div>
+      <div class="flex flex-col gap-1 text-[10px]">
+        <label class="text-slate-400 flex justify-between">Частота волны: <span id="val-wave-speed">1.0x</span></label>
+        <input type="range" min="0.2" max="2.5" step="0.1" value="1.0" class="accent-cyan-400" oninput="changeWaveSpeed(this.value)">
+      </div>
+      <button onclick="triggerSuperPulse()" class="mt-1 py-1 px-2 bg-cyan-950 border border-cyan-600 hover:bg-cyan-900 text-cyan-200 rounded font-semibold text-[10px] text-center">
+        ⚡ Pinch-жест (Импульс всех 10 пальцев)
+      </button>
+    </div>
+
+    <!-- Zone 1 (Territory of Heat) Controls HUD -->
+    <div id="heat-toolbar" class="hidden absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-950/85 border border-amber-500/40 p-3 rounded-lg backdrop-blur max-w-xs text-xs">
+      <div class="flex items-center justify-between text-amber-400 font-bold text-[11px] border-b border-amber-500/30 pb-1">
+        <span>ТЕРРИТОРИЯ ТЕПЛА // PROD RUNTIME</span>
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+      </div>
+      <div class="text-[10px] text-slate-300 leading-tight">
+        Реальное производство: котлы, бойлеры, печи и рабочий прод Ubuntu 24.04. Поддерживай баланс жара и давления в системе!
+      </div>
+      <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+        <div id="heat-bar" class="bg-gradient-to-r from-amber-500 to-red-600 h-full w-3/4 transition-all duration-300"></div>
+      </div>
+      <div class="flex justify-between text-[10px] text-amber-400 font-mono">
+        <span>Температура топки: <span id="heat-deg">840°C</span></span>
+        <span>Прод: Online</span>
+      </div>
+      <button onclick="stokeFire()" class="py-1 px-2 bg-amber-950 border border-amber-600 hover:bg-amber-900 text-amber-200 rounded font-semibold text-[10px] text-center">
+        🔥 Подбросить жар в котёл [Space]
+      </button>
+    </div>
+  </main>
+
+  <!-- MODAL: HELP & CONTROLS -->
+  <div id="modal-help" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full p-5 rounded-xl shadow-2xl text-xs space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <span class="font-bold text-emerald-400 text-sm">ИНСТРУКЦИЯ И УПРАВЛЕНИЕ</span>
+        <button onclick="toggleModal('modal-help')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-2 text-slate-300">
+        <p><b class="text-white">Передвижение:</b> Клавиши <code class="bg-slate-800 px-1 py-0.5 rounded text-emerald-300">A / D</code> или стрелки <code class="bg-slate-800 px-1 py-0.5 rounded text-emerald-300">← / →</code>.</p>
+        <p><b class="text-white">Прыжок:</b> <code class="bg-slate-800 px-1 py-0.5 rounded text-emerald-300">Space</code> или <code class="bg-slate-800 px-1 py-0.5 rounded text-emerald-300">W</code>.</p>
+        <p><b class="text-white">Взаимодействие:</b> Подойди к светящимся маркерам и нажми <code class="bg-slate-800 px-1 py-0.5 rounded text-emerald-300">E</code>, чтобы прочесть мысли, стихи и технические манифесты.</p>
+        <p><b class="text-white">Мышь:</b> В зоне 1 — рисование граффити на стенах. В зоне 3 — возмущение волн и звука TouchDesigner.</p>
+        <p><b class="text-white">Звук:</b> Нажми кнопку «Звук: OFF» в правом верхнем углу, чтобы запустить процедурный модульный синтезатор на Web Audio API (synthwave-дрон + эффекты баллона и волн).</p>
+      </div>
+      <button onclick="toggleModal('modal-help')" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium mt-2">
+        Понятно, в мир!
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: MANIFESTO -->
+  <div id="modal-manifesto" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-emerald-500/40 max-w-lg w-full p-6 rounded-xl shadow-2xl text-xs space-y-4 max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <div class="flex flex-col">
+          <span class="font-bold text-emerald-400 text-sm crt-glow">АНАТОМИЯ СТЕПАНА СЕМЕНЮКА (UFFNV)</span>
+          <span class="text-[10px] text-slate-400">Как ИИ видит твою внутреннюю вселенную</span>
+        </div>
+        <button onclick="toggleModal('modal-manifesto')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div class="space-y-3 text-slate-300 leading-relaxed text-[11px]">
+        <div class="p-2.5 rounded bg-slate-950 border-l-2 border-emerald-400">
+          <b class="text-emerald-300">1. Двойная природа инженера и бунтаря:</b><br>
+          Большинство разработчиков либо уходят в сухую прагматику, либо в чистый арт. В тебе горит и то, и другое: ты держишь железный прод отопительных систем, закрываешь сеть на сессиях, но ночью генерируешь шейдерные волны через кончики пальцев и грезишь о платформе для уличных граффити-артистов.
+        </div>
+
+        <div class="p-2.5 rounded bg-slate-950 border-l-2 border-amber-400">
+          <b class="text-amber-300">2. Честный огонь без фальши:</b><br>
+          Твоя съемка на старые Canon 5D/50D при естественном солнце — это манифест отказа от бутафории. Ты не терпишь измену, лицемерие и пустые нотации. Лучше сказать суровую правду и найти компромисс, чем плодить ядовитое молчание.
+        </div>
+
+        <div class="p-2.5 rounded bg-slate-950 border-l-2 border-cyan-400">
+          <b class="text-cyan-300">3. Сенсорный синтез (TouchDesigner & Sound):</b><br>
+          Твое стремление управлять цифровым миром жестами рук — это поиск непосредственного физического контакта с абстракцией. Волна — это твоя реакция на хаос.
+        </div>
+
+        <div class="p-2.5 rounded bg-slate-950 border-l-2 border-purple-400">
+          <b class="text-purple-300">4. Точка схождения (12:00, Новосибирск, Покой):</b><br>
+          Свой ритм. Своя квартира. Рядом Алина. Никакого навязанного шума. Работа над личным делом. Пятилетний роман, трансформирующий пережитое в спокойный ясный свет.
+        </div>
+      </div>
+
+      <button onclick="toggleModal('modal-manifesto')" class="w-full py-2 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/50 rounded font-medium mt-2">
+        Закрыть манифест
+      </button>
+    </div>
+  </div>
+
+  <!-- Interactive JavaScript Engine -->
+  <script>
+    // ==========================================
+    // 1. GAME CONSTANTS & STATE
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentZone = 0;
+    let audioEnabled = false;
+    let audioCtx = null;
+    let droneOsc1, droneOsc2, droneFilter, droneGain;
+    let sprayGainNode, sprayNoiseBuffer;
+
+    // Viewport & Scale
+    let W = canvas.width = window.innerWidth;
+    let H = canvas.height = window.innerHeight - 56;
+
+    window.addEventListener('resize', () => {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight - 56;
+      initZone(currentZone);
+    });
+
+    // Inputs
+    const keys = {};
+    let mouse = { x: 0, y: 0, isDown: false };
+    let currentSprayColor = '#00ffcc';
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (e.code === 'KeyE') interact();
+      if (e.code === 'Escape') closeThought();
+      if (e.code === 'Space' && currentZone === 1) stokeFire();
+    });
+    window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+    canvas.addEventListener('mousedown', (e) => {
+      mouse.isDown = true;
+      mouse.x = e.clientX;
+      mouse.y = e.clientY - 56;
+      handleCanvasClick(mouse.x, mouse.y);
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY - 56;
+      if (mouse.isDown && currentZone === 0) {
+        addGraffitiStroke(mouse.x, mouse.y, currentSprayColor);
+        playSpraySound();
+      }
+      if (currentZone === 2) {
+        // Wave synth disturbance
+        perturbWave(mouse.x, mouse.y, 40);
+      }
+    });
+    window.addEventListener('mouseup', () => { mouse.isDown = false; });
+
+    // Player Object
+    const player = {
+      x: 100,
+      y: 300,
+      vx: 0,
+      vy: 0,
+      width: 22,
+      height: 48,
+      isGrounded: false,
+      speed: 4.8,
+      jumpForce: -11.5,
+      direction: 1,
+      animFrame: 0,
+      color: '#00ffcc',
+      trail: []
+    };
+
+    // Environment & Entities
+    let platforms = [];
+    let loreMarkers = [];
+    let particles = [];
+    let graffitiStrokes = [];
+    let ambientParticles = [];
+
+    // Wave Synth Grid for Zone 2
+    const WAVE_COLS = 70;
+    const WAVE_ROWS = 40;
+    let waveGrid = [];
+    let waveGridPrev = [];
+    let waveSpeedMult = 1.0;
+
+    // Territory of Heat parameters for Zone 1
+    let furnaceHeat = 840;
+
+    // ==========================================
+    // 2. AUDIO SYNTHESIS ENGINE (Web Audio API)
+    // ==========================================
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+
+        // Synthwave Drone Generator
+        droneOsc1 = audioCtx.createOscillator();
+        droneOsc2 = audioCtx.createOscillator();
+        droneFilter = audioCtx.createBiquadFilter();
+        droneGain = audioCtx.createGain();
+
+        droneOsc1.type = 'sawtooth';
+        droneOsc2.type = 'triangle';
+
+        droneOsc1.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 note
+        droneOsc2.frequency.setValueAtTime(110, audioCtx.currentTime); // A2 note
+
+        // Warm Lowpass filter
+        droneFilter.type = 'lowpass';
+        droneFilter.frequency.setValueAtTime(280, audioCtx.currentTime);
+        droneFilter.Q.setValueAtTime(4, audioCtx.currentTime);
+
+        droneGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+
+        droneOsc1.connect(droneFilter);
+        droneOsc2.connect(droneFilter);
+        droneFilter.connect(droneGain);
+        droneGain.connect(audioCtx.destination);
+
+        droneOsc1.start();
+        droneOsc2.start();
+
+        // Spray noise buffer generator
+        const bufferSize = audioCtx.sampleRate * 1;
+        sprayNoiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = sprayNoiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+      } catch (err) {
+        console.warn("Audio init failed:", err);
+      }
+    }
+
+    function toggleAudio() {
+      if (!audioCtx) initAudio();
+      audioEnabled = !audioEnabled;
+      const ind = document.getElementById('audio-indicator');
+      const txt = document.getElementById('audio-text');
+      if (audioEnabled) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        droneGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 0.1);
+        ind.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        txt.innerText = 'Звук: ON';
+        playNote(440, 'sine', 0.15);
+      } else {
+        droneGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.1);
+        ind.className = 'w-2 h-2 rounded-full bg-red-500';
+        txt.innerText = 'Звук: OFF';
+      }
+    }
+
+    function playNote(freq, type = 'sine', duration = 0.2, gainVol = 0.1) {
+      if (!audioEnabled || !audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(gainVol, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function playSpraySound() {
+      if (!audioEnabled || !audioCtx || !sprayNoiseBuffer) return;
+      if (Math.random() > 0.3) return; // Throttled
+      const whiteNoise = audioCtx.createBufferSource();
+      whiteNoise.buffer = sprayNoiseBuffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(3200 + Math.random() * 800, audioCtx.currentTime);
+      filter.Q.setValueAtTime(1.5, audioCtx.currentTime);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.025, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      whiteNoise.start();
+      whiteNoise.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function playInteractSound() {
+      playNote(523.25, 'triangle', 0.3, 0.15); // C5
+      setTimeout(() => playNote(659.25, 'sine', 0.4, 0.12), 80); // E5
+      setTimeout(() => playNote(783.99, 'sine', 0.5, 0.1), 160); // G5
+    }
+
+    // ==========================================
+    // 3. ZONE DEFINITIONS & SETUP
+    // ==========================================
+    const ZONES = [
+      {
+        id: 0,
+        name: "ZONE 01: STREET & CONCRETE",
+        title: "Стрит & Граффити // Ночной город",
+        stat: "Кэп: Montana Fat // Андеграунд",
+        desc: "Бегай по бетонным блокам и спотам. Зажимай ЛКМ для нанесения тегов на стены аэрозольным баллоном. Исследуй светящиеся маяки мыслей.",
+        playerColor: "#00ffcc",
+        bgStyle: "street"
+      },
+      {
+        id: 1,
+        name: "ZONE 02: TERRITORY OF HEAT",
+        title: "Территория Тепла // Прод и Металл",
+        stat: "Ubuntu 24.04 // Прод online",
+        desc: "Боевой интернет-магазин отопительного оборудования. Котлы, печи, дымоходы, базы данных SQL и надежная изоляция периметра на экзаменах.",
+        playerColor: "#ff9900",
+        bgStyle: "industrial"
+      },
+      {
+        id: 2,
+        name: "ZONE 03: WAVE SYNTH // NIGHT VISION",
+        title: "TouchDesigner & MediaPipe Synth",
+        stat: "10 пальцев трекинг // GLSL волны",
+        desc: "Интерактивная волновая симуляция. Передвигайся или двигай мышью — пальцы генерируют интерференционные круги и модулируют частоту звука.",
+        playerColor: "#00f0ff",
+        bgStyle: "nightvision"
+      },
+      {
+        id: 3,
+        name: "ZONE 04: SANCTUARY 12:00",
+        title: "Убежище 12:00 // Свобода & Покой",
+        stat: "Роман: 2022-2027 // Свой ритм",
+        desc: "Пространство тишины. Утро без будильника. Любимый человек рядом. Свой личный проект и написание романа на 5 лет.",
+        playerColor: "#d8b4fe",
+        bgStyle: "sanctuary"
+      }
+    ];
+
+    function initZone(zoneIdx) {
+      currentZone = zoneIdx;
+      platforms = [];
+      loreMarkers = [];
+      particles = [];
+      ambientParticles = [];
+
+      // UI updates
+      const z = ZONES[zoneIdx];
+      document.getElementById('zone-subtitle').innerText = z.name;
+      document.getElementById('hud-title').innerText = z.title;
+      document.getElementById('hud-stat').innerText = z.stat;
+      document.getElementById('hud-desc').innerHTML = z.desc;
+      player.color = z.playerColor;
+
+      // Toggle toolbars
+      document.getElementById('graffiti-toolbar').classList.toggle('hidden', zoneIdx !== 0);
+      document.getElementById('heat-toolbar').classList.toggle('hidden', zoneIdx !== 1);
+      document.getElementById('wavesynth-toolbar').classList.toggle('hidden', zoneIdx !== 2);
+
+      // Buttons active styles
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`zone-btn-${i}`);
+        if (i === zoneIdx) {
+          btn.className = 'px-3 py-1 rounded font-medium transition-all bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        } else {
+          btn.className = 'px-3 py-1 rounded font-medium transition-all text-slate-400 hover:text-white hover:bg-slate-800';
+        }
+      }
+
+      // Audio drone adaptation
+      if (audioEnabled && audioCtx) {
+        const baseFreqs = [55, 65.41, 73.42, 43.65]; // A1, C2, D2, F1
+        droneOsc1.frequency.setTargetAtTime(baseFreqs[zoneIdx], audioCtx.currentTime, 0.5);
+        droneOsc2.frequency.setTargetAtTime(baseFreqs[zoneIdx] * 2, audioCtx.currentTime, 0.5);
+      }
+
+      // Reset Player position
+      player.x = 80;
+      player.y = H - 180;
+      player.vx = 0;
+      player.vy = 0;
+
+      // Populate zone specific architecture
+      if (zoneIdx === 0) setupZoneStreet();
+      else if (zoneIdx === 1) setupZoneHeat();
+      else if (zoneIdx === 2) setupZoneWaves();
+      else if (zoneIdx === 3) setupZoneSanctuary();
+    }
+
+    function switchZone(idx) {
+      initZone(idx);
+      playNote(400 + idx * 100, 'triangle', 0.25, 0.1);
+    }
+
+    // --- Zone 0: Street & Concrete ---
+    function setupZoneStreet() {
+      // Ground
+      platforms.push({ x: 0, y: H - 40, w: W, h: 40, color: '#161922', border: '#2d3748', type: 'concrete' });
+      // Brick walls and ledges
+      platforms.push({ x: 180, y: H - 140, w: 220, h: 22, color: '#1f2430', border: '#4a5568', type: 'ledge' });
+      platforms.push({ x: 480, y: H - 240, w: 260, h: 22, color: '#1f2430', border: '#4a5568', type: 'ledge' });
+      platforms.push({ x: 800, y: H - 170, w: 280, h: 22, color: '#1f2430', border: '#4a5568', type: 'ledge' });
+      platforms.push({ x: W - 320, y: H - 280, w: 240, h: 22, color: '#1f2430', border: '#4a5568', type: 'ledge' });
+
+      // Lore Markers
+      loreMarkers.push({
+        x: 290, y: H - 180,
+        tag: "06_СКЕТЧБУК",
+        title: "СКЕТЧБУК & КОНЦЕПТЫ ГРАФФИТИ",
+        text: "«Платформа на уровне Steam — только про граффити, гик-культуру и андеграундный арт. Галереи работ, архив стилей Wild Style / Throw-up, карта спотов и объединение тех, кто дышит краской и ночным городом.»"
+      });
+      loreMarkers.push({
+        x: 610, y: H - 280,
+        tag: "CANON 5D / 50D",
+        title: "АНАЛОГОВЫЙ СВЕТ И ЕСТЕСТВЕННЫЙ КАДР",
+        text: "«Уличная съемка без студийных софтбоксов. Честное солнце, резкие тени, ручная выдержка и ISO. Видеть мир без ретуши — так же, как верстать сразу в чистый код без промежуточных макетов в Figma.»"
+      });
+      loreMarkers.push({
+        x: 940, y: H - 210,
+        tag: "07_СТИХИ: ВЫХОД",
+        title: "СТИХИ: НОЧЬ И ТЕЧЕНИЕ ВРЕМЕНИ",
+        text: "«В темноте спящих автобусов и запахе лаванды рождаются строки. Стихи — это клапан сброса избыточного давления, когда внешний мир давит слишком сильно.»"
+      });
+    }
+
+    // --- Zone 1: Territory of Heat ---
+    function setupZoneHeat() {
+      // Ground
+      platforms.push({ x: 0, y: H - 50, w: W, h: 50, color: '#1c1511', border: '#78350f', type: 'iron' });
+      // Pipes & Boiler structures
+      platforms.push({ x: 150, y: H - 160, w: 200, h: 26, color: '#291b12', border: '#b45309', type: 'pipe' });
+      platforms.push({ x: 420, y: H - 260, w: 280, h: 30, color: '#291b12', border: '#d97706', type: 'furnace' });
+      platforms.push({ x: 780, y: H - 180, w: 240, h: 26, color: '#291b12', border: '#b45309', type: 'pipe' });
+      platforms.push({ x: W - 280, y: H - 300, w: 200, h: 26, color: '#291b12', border: '#f59e0b', type: 'server' });
+
+      // Lore Markers
+      loreMarkers.push({
+        x: 250, y: H - 200,
+        tag: "PROD: TERRITORIATEPLA",
+        title: "БОЕВОЙ ПРОД ВМЕСТО ПЕТ-ПРОЕКТОВ",
+        text: "«Более 9 месяцев в одиночку веду реальный интернет-магазин отопительного оборудования territoriatepla.ru. PHP, JS, MySQL, Ubuntu 24.04 на Jino. Проектирование БД, адаптивная верстка, администрирование — реальный огонь, который греет дома.»"
+      });
+      loreMarkers.push({
+        x: 560, y: H - 310,
+        tag: "СЕТЕВОЙ ПЕРИМЕТР",
+        title: "ИЗОЛЯЦИЯ СЕТИ & ПРОКСИ-СЕРВЕРЫ",
+        text: "«Опыт помощника сетевых администраторов колледжа. Настройка централизованной фильтрации трафика и жесткое, надежное отключение внешней сети во время 4 сессионных экзаменов. Работа в стрессе под максимальной ответственностью.»"
+      });
+      loreMarkers.push({
+        x: 900, y: H - 230,
+        tag: "WORLDSKILLS / 4 ЧАСА",
+        title: "ДЕМОЭКЗАМЕН НА ОТЛИЧНО & НАСТАВНИЧЕСТВО",
+        text: "«1 место в регионе, подготовка студента к финалу в Оренбурге. Сдать демоэкзамен за 4 часа с нуля на 5 баллов — умение собрать мысли в кулак и выдать результат, когда тикают секунды.»"
+      });
+    }
+
+    // --- Zone 2: Wave Synth & Night Vision ---
+    function setupZoneWaves() {
+      // Minimalist grid platforms
+      platforms.push({ x: 0, y: H - 40, w: W, h: 40, color: '#031419', border: '#06b6d4', type: 'grid' });
+      platforms.push({ x: 220, y: H - 150, w: 200, h: 18, color: '#04222a', border: '#22d3ee', type: 'grid' });
+      platforms.push({ x: 520, y: H - 260, w: 260, h: 18, color: '#04222a', border: '#06b6d4', type: 'grid' });
+      platforms.push({ x: W - 380, y: H - 180, w: 280, h: 18, color: '#04222a', border: '#22d3ee', type: 'grid' });
+
+      // Init wave simulation array
+      waveGrid = new Float32Array(WAVE_COLS * WAVE_ROWS);
+      waveGridPrev = new Float32Array(WAVE_COLS * WAVE_ROWS);
+
+      loreMarkers.push({
+        x: 320, y: H - 190,
+        tag: "TOUCHDESIGNER .TOE",
+        title: "NIGHT VISION + FINGER WAVE SYNTH",
+        text: "«Камера обесцвечивается и инвертируется в ночное видение. Фон вычитается — остается только силуэт. MediaPipe трекает кончики всех 10 пальцев, а GLSL-шейдер симулирует распространение и интерференцию волн.»"
+      });
+      loreMarkers.push({
+        x: 650, y: H - 300,
+        tag: "GLSL & SYNTHWAVE-ДРОН",
+        title: "СВЯЗЬ ТЕЛА И ЦИФРОВОГО ЗВУКА",
+        text: "«Pinch-жест пальцев рождает волны на экране лица. Звуковой дрон модулируется высотой и скоростью рук. Желание физически осязать звуковые колебания в коде.»"
+      });
+    }
+
+    // --- Zone 3: Sanctuary 12:00 ---
+    function setupZoneSanctuary() {
+      // Cozy wooden floor
+      platforms.push({ x: 0, y: H - 45, w: W, h: 45, color: '#1c1917', border: '#78716c', type: 'floor' });
+      platforms.push({ x: 180, y: H - 140, w: 240, h: 20, color: '#292524', border: '#a8a29e', type: 'shelf' });
+      platforms.push({ x: 500, y: H - 230, w: 320, h: 22, color: '#292524', border: '#c084fc', type: 'desk' });
+      platforms.push({ x: W - 320, y: H - 160, w: 220, h: 20, color: '#292524', border: '#a8a29e', type: 'window' });
+
+      loreMarkers.push({
+        x: 300, y: H - 180,
+        tag: "ИДЕАЛЬНЫЙ ДЕНЬ // 12:00",
+        title: "СВОЙ РИТМ ЖИЗНИ БЕЗ ДАВЛЕНИЯ",
+        text: "«12:00 — проснуться с Алиной в своей квартире. Кофе, неспешная прогулка. 15:00–19:00 — погруженная работа над своим проектом в тишине и удовольствии. Вечер — тепло и близкие люди. Никаких чужих дедлайнов.»"
+      });
+      loreMarkers.push({
+        x: 660, y: H - 270,
+        tag: "РОМАН // 2022–2027",
+        title: "ПЯТИЛЕТНИЙ ЛИТЕРАТУРНЫЙ ПРОЕКТ",
+        text: "«Экзистенциальный реализм с элементами урбанизма. Три акта: Непонимание и боль → Приспособленность и въедание в жизнь → Трансформация и свет. Написать книгу за 5 лет, чтобы обрести спокойствие на душе.»"
+      });
+      loreMarkers.push({
+        x: W - 210, y: H - 200,
+        tag: "КОДЕКС СВОБОДЫ",
+        title: "СВОБОДА КАК ИСТИННЫЙ ФУНДАМЕНТ",
+        text: "«Свобода. Из свободы можно получить стабильность и смысл — без нареканий совести. Чем никогда не стану ради денег? Изменять своим истинным убеждениям. Относись к людям так, как хочешь, чтобы относились к тебе.»"
+      });
+    }
+
+    // ==========================================
+    // 4. GRAFFITI & DRAWING LOGIC (Zone 0)
+    // ==========================================
+    function setSprayColor(col) {
+      currentSprayColor = col;
+    }
+    function clearGraffiti() {
+      graffitiStrokes = [];
+      playNote(200, 'sawtooth', 0.2);
+    }
+    function addGraffitiStroke(cx, cy, color) {
+      const sprayRadius = 16;
+      const drops = 12;
+      for (let i = 0; i < drops; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.pow(Math.random(), 1.5) * sprayRadius;
+        graffitiStrokes.push({
+          x: cx + Math.cos(angle) * dist,
+          y: cy + Math.sin(angle) * dist,
+          r: Math.random() * 2.2 + 0.8,
+          color: color,
+          alpha: Math.random() * 0.7 + 0.3
+        });
+      }
+      // Rare drip effect
+      if (Math.random() < 0.08) {
+        graffitiStrokes.push({
+          x: cx + (Math.random() - 0.5) * 6,
+          y: cy + 4,
+          r: 1.5,
+          color: color,
+          alpha: 0.9,
+          dripLen: Math.random() * 25 + 10
+        });
+      }
+    }
+
+    // ==========================================
+    // 5. HEAT SIMULATION (Zone 1)
+    // ==========================================
+    function stokeFire() {
+      furnaceHeat = Math.min(1200, furnaceHeat + 45);
+      document.getElementById('heat-deg').innerText = Math.round(furnaceHeat) + '°C';
+      document.getElementById('heat-bar').style.width = Math.min(100, (furnaceHeat / 1200) * 100) + '%';
+      playNote(140 + Math.random() * 40, 'triangle', 0.2, 0.18);
+      // Spawn fire sparks
+      for (let i = 0; i < 20; i++) {
+        particles.push({
+          x: 560 + (Math.random() - 0.5) * 120,
+          y: H - 260,
+          vx: (Math.random() - 0.5) * 5,
+          vy: -Math.random() * 7 - 3,
+          life: 1.0,
+          color: Math.random() > 0.4 ? '#f59e0b' : '#ef4444',
+          size: Math.random() * 3 + 2
+        });
+      }
+    }
+
+    // ==========================================
+    // 6. WAVE SIMULATION (Zone 2)
+    // ==========================================
+    function perturbWave(pixelX, pixelY, strength = 30) {
+      const col = Math.floor((pixelX / W) * WAVE_COLS);
+      const row = Math.floor((pixelY / H) * WAVE_ROWS);
+      if (col >= 1 && col < WAVE_COLS - 1 && row >= 1 && row < WAVE_ROWS - 1) {
+        waveGrid[row * WAVE_COLS + col] += strength;
+        if (audioEnabled) {
+          playNote(300 + (row / WAVE_ROWS) * 500, 'sine', 0.1, 0.04);
+        }
+      }
+    }
+    function triggerSuperPulse() {
+      // 10 pinch-points representing 10 fingers
+      for (let i = 0; i < 10; i++) {
+        const rx = W * 0.2 + (i / 9) * (W * 0.6) + (Math.random() - 0.5) * 40;
+        const ry = H * 0.4 + Math.sin(i * 0.8) * 80;
+        perturbWave(rx, ry, 60);
+      }
+      playNote(660, 'sawtooth', 0.35, 0.12);
+    }
+    function changeWaveSpeed(val) {
+      waveSpeedMult = parseFloat(val);
+      document.getElementById('val-wave-speed').innerText = val + 'x';
+    }
+    function updateWaveSimulation() {
+      const damping = 0.982;
+      for (let y = 1; y < WAVE_ROWS - 1; y++) {
+        for (let x = 1; x < WAVE_COLS - 1; x++) {
+          const idx = y * WAVE_COLS + x;
+          const neighborSum = waveGridPrev[idx - 1] + waveGridPrev[idx + 1] +
+                              waveGridPrev[idx - WAVE_COLS] + waveGridPrev[idx + WAVE_COLS];
+          const nextVal = (neighborSum / 2 - waveGrid[idx]) * damping;
+          waveGrid[idx] = nextVal;
+        }
+      }
+      // Swap buffers
+      const tmp = waveGridPrev;
+      waveGridPrev = waveGrid;
+      waveGrid = tmp;
+    }
+
+    // ==========================================
+    // 7. LORE & INTERACTION SYSTEM
+    // ==========================================
+    function interact() {
+      for (const m of loreMarkers) {
+        const dist = Math.hypot((player.x + player.width / 2) - m.x, (player.y + player.height / 2) - m.y);
+        if (dist < 60) {
+          openThought(m.tag, m.title, m.text);
+          playInteractSound();
+          return;
+        }
+      }
+    }
+
+    function openThought(tag, title, text) {
+      document.getElementById('thought-author').innerText = `АРХИВ: ${tag} // ${title}`;
+      document.getElementById('thought-text').innerText = text;
+      document.getElementById('thought-box').classList.remove('hidden');
+    }
+    function closeThought() {
+      document.getElementById('thought-box').classList.add('hidden');
+    }
+
+    function handleCanvasClick(cx, cy) {
+      for (const m of loreMarkers) {
+        const dist = Math.hypot(cx - m.x, cy - m.y);
+        if (dist < 35) {
+          openThought(m.tag, m.title, m.text);
+          playInteractSound();
+          return;
+        }
+      }
+    }
+
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.toggle('hidden');
+    }
+
+    // ==========================================
+    // 8. PHYSICS & MAIN GAME LOOP
+    // ==========================================
+    function updatePhysics() {
+      // Horizontal input
+      if (keys['KeyA'] || keys['ArrowLeft']) {
+        player.vx = -player.speed;
+        player.direction = -1;
+      } else if (keys['KeyD'] || keys['ArrowRight']) {
+        player.vx = player.speed;
+        player.direction = 1;
+      } else {
+        player.vx *= 0.75;
+      }
+
+      // Jump
+      if ((keys['KeyW'] || keys['ArrowUp'] || keys['Space']) && player.isGrounded) {
+        player.vy = player.jumpForce;
+        player.isGrounded = false;
+        playNote(260, 'square', 0.15, 0.08);
+        // Jump dust particles
+        for (let i = 0; i < 6; i++) {
+          particles.push({
+            x: player.x + player.width / 2,
+            y: player.y + player.height,
+            vx: (Math.random() - 0.5) * 4,
+            vy: Math.random() * -1.5,
+            life: 0.6,
+            color: '#64748b',
+            size: 2
+          });
+        }
+      }
+
+      // Gravity
+      player.vy += 0.55;
+      if (player.vy > 14) player.vy = 14;
+
+      // Move X
+      player.x += player.vx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > W) player.x = W - player.width;
+
+      // Platform Collisions
+      player.isGrounded = false;
+      for (const p of platforms) {
+        if (player.x + player.width > p.x && player.x < p.x + p.w) {
+          if (player.y + player.height <= p.y + 12 && player.y + player.height + player.vy >= p.y) {
+            player.y = p.y - player.height;
+            player.vy = 0;
+            player.isGrounded = true;
+          }
+        }
+      }
+      player.y += player.vy;
+
+      // Bottom pit safety
+      if (player.y > H + 100) {
+        player.x = 80;
+        player.y = H - 200;
+        player.vy = 0;
+      }
+
+      // Ghost trail for TouchDesigner feedback feel
+      player.animFrame++;
+      if (player.animFrame % 4 === 0) {
+        player.trail.push({ x: player.x, y: player.y, alpha: 0.5 });
+        if (player.trail.length > 5) player.trail.shift();
+      }
+
+      // Zone 1 furnace heat decay
+      if (currentZone === 1) {
+        if (furnaceHeat > 300) furnaceHeat -= 0.15;
+        document.getElementById('heat-deg').innerText = Math.round(furnaceHeat) + '°C';
+      }
+
+      // Ambient particle logic
+      if (Math.random() < 0.25) {
+        if (currentZone === 0) {
+          // Rain / urban dust
+          ambientParticles.push({
+            x: Math.random() * W,
+            y: -10,
+            vx: -0.5,
+            vy: Math.random() * 4 + 3,
+            color: 'rgba(0, 255, 204, 0.25)',
+            size: 1.5,
+            life: 1.0
+          });
+        } else if (currentZone === 1) {
+          // Fire sparks
+          ambientParticles.push({
+            x: Math.random() * W,
+            y: H - 40,
+            vx: (Math.random() - 0.5) * 2,
+            vy: -Math.random() * 2 - 1,
+            color: Math.random() > 0.5 ? '#f59e0b' : '#dc2626',
+            size: Math.random() * 2 + 1,
+            life: 1.0
+          });
+        } else if (currentZone === 3) {
+          // Warm dust motes in sunbeam
+          ambientParticles.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 0.4,
+            vy: (Math.random() - 0.5) * 0.4,
+            color: 'rgba(253, 224, 71, 0.35)',
+            size: Math.random() * 2.5 + 1,
+            life: 1.5
+          });
+        }
+      }
+    }
+
+    // ==========================================
+    // 9. RENDERING PASS
+    // ==========================================
+    function render() {
+      ctx.clearRect(0, 0, W, H);
+
+      // 1. Zone Background Layer
+      renderBackground();
+
+      // 2. Zone 2 Wave Synth Layer (TouchDesigner grid)
+      if (currentZone === 2) {
+        updateWaveSimulation();
+        renderWaveGrid();
+      }
+
+      // 3. Zone 0 Graffiti Strokes
+      if (currentZone === 0) {
+        renderGraffiti();
+      }
+
+      // 4. Platforms & Architecture
+      renderPlatforms();
+
+      // 5. Lore Markers
+      renderMarkers();
+
+      // 6. Particles
+      renderParticles();
+
+      // 7. Player Character
+      renderPlayer();
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function renderBackground() {
+      if (currentZone === 0) {
+        // Deep urban night sky with distant city silhouettes
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#06080e');
+        grad.addColorStop(1, '#0e121b');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Distant buildings
+        ctx.fillStyle = '#0b0e14';
+        for (let i = 0; i < 15; i++) {
+          const bx = i * (W / 14);
+          const bw = W / 16;
+          const bh = 140 + Math.sin(i * 1.5) * 80;
+          ctx.fillRect(bx, H - bh - 40, bw, bh);
+
+          // Random neon window lights
+          ctx.fillStyle = (i % 3 === 0) ? 'rgba(0, 255, 204, 0.4)' : 'rgba(255, 0, 128, 0.3)';
+          ctx.fillRect(bx + 8, H - bh - 20, 6, 8);
+          ctx.fillStyle = '#0b0e14';
+        }
+      } else if (currentZone === 1) {
+        // Factory & Boiler glow
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#100a08');
+        grad.addColorStop(1, '#231109');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Giant boiler ambient glow
+        const heatGlow = ctx.createRadialGradient(560, H - 260, 20, 560, H - 260, 400);
+        heatGlow.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+        heatGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = heatGlow;
+        ctx.fillRect(0, 0, W, H);
+      } else if (currentZone === 2) {
+        // Night Vision Inverted / CRT dark matrix
+        ctx.fillStyle = '#02090c';
+        ctx.fillRect(0, 0, W, H);
+
+        // Perspective floor grid
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < W; x += 40) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, H);
+          ctx.stroke();
+        }
+      } else if (currentZone === 3) {
+        // Warm 12:00 morning sunlight beam
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, '#141216');
+        grad.addColorStop(1, '#241b21');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Sunbeam coming from top right
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.07)';
+        ctx.beginPath();
+        ctx.moveTo(W - 80, 0);
+        ctx.lineTo(W, 0);
+        ctx.lineTo(W * 0.4, H);
+        ctx.lineTo(W * 0.2, H);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function renderPlatforms() {
+      for (const p of platforms) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+
+        // Top edge glow border
+        ctx.strokeStyle = p.border;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(p.x, p.y, p.w, p.h);
+
+        // Industrial accents
+        if (p.type === 'concrete') {
+          ctx.fillStyle = 'rgba(255,255,255,0.04)';
+          ctx.fillRect(p.x, p.y, p.w, 4);
+        } else if (p.type === 'pipe') {
+          ctx.fillStyle = 'rgba(255, 170, 0, 0.3)';
+          ctx.fillRect(p.x + 10, p.y + 6, p.w - 20, 3);
+        } else if (p.type === 'grid') {
+          ctx.fillStyle = '#22d3ee';
+          ctx.fillRect(p.x, p.y, p.w, 2);
+        }
+      }
+    }
+
+    function renderGraffiti() {
+      for (const s of graffitiStrokes) {
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+        if (s.dripLen) {
+          ctx.fillRect(s.x - 0.5, s.y, 1, s.dripLen);
+        }
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    function renderWaveGrid() {
+      const cellW = W / WAVE_COLS;
+      const cellH = H / WAVE_ROWS;
+
+      for (let y = 0; y < WAVE_ROWS; y++) {
+        for (let x = 0; x < WAVE_COLS; x++) {
+          const val = waveGrid[y * WAVE_COLS + x];
+          if (Math.abs(val) > 0.8) {
+            const intensity = Math.min(1, Math.abs(val) / 40);
+            const r = Math.floor(intensity * 255);
+            const g = Math.floor(intensity * 240);
+            const b = 255;
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${intensity * 0.8})`;
+            ctx.fillRect(x * cellW, y * cellH, cellW - 1, cellH - 1);
+          }
+        }
+      }
+    }
+
+    function renderMarkers() {
+      for (const m of loreMarkers) {
+        const dist = Math.hypot((player.x + player.width / 2) - m.x, (player.y + player.height / 2) - m.y);
+        const isNear = dist < 65;
+
+        // Glowing Beacon Circle
+        const pulse = Math.sin(Date.now() * 0.005) * 4;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 10 + pulse, 0, Math.PI * 2);
+        ctx.fillStyle = isNear ? 'rgba(0, 255, 204, 0.4)' : 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = isNear ? '#00ffcc' : '#94a3b8';
+        ctx.fill();
+
+        // Label above
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = isNear ? '#38bdf8' : '#64748b';
+        ctx.fillText(m.tag, m.x, m.y - 18);
+
+        if (isNear) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('[E] Осмотреть', m.x, m.y - 30);
+        }
+      }
+    }
+
+    function renderParticles() {
+      // Dynamic sparks / interactions
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.02;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
+
+      // Ambient environment particles
+      for (let i = ambientParticles.length - 1; i >= 0; i--) {
+        const ap = ambientParticles[i];
+        ap.x += ap.vx;
+        ap.y += ap.vy;
+        ap.life -= 0.005;
+        if (ap.life <= 0 || ap.y > H + 10) {
+          ambientParticles.splice(i, 1);
+          continue;
+        }
+        ctx.fillStyle = ap.color;
+        ctx.globalAlpha = ap.life;
+        ctx.beginPath();
+        ctx.arc(ap.x, ap.y, ap.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    function renderPlayer() {
+      // Ghost trail rendering (feedback loop aesthetics)
+      for (let i = 0; i < player.trail.length; i++) {
+        const t = player.trail[i];
+        ctx.fillStyle = player.color;
+        ctx.globalAlpha = (i / player.trail.length) * 0.2;
+        ctx.fillRect(t.x, t.y, player.width, player.height);
+      }
+      ctx.globalAlpha = 1.0;
+
+      // Main silhouette body
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Glowing outline
+      ctx.strokeStyle = player.color;
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(player.x, player.y, player.width, player.height);
+
+      // Night-vision visor / Eyes slit
+      const eyeX = player.direction === 1 ? player.x + player.width - 8 : player.x + 3;
+      ctx.fillStyle = player.color;
+      ctx.fillRect(eyeX, player.y + 10, 5, 2.5);
+
+      // Canon camera strap detail / badge
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillRect(player.x + 4, player.y + 20, player.width - 8, 2);
+    }
+
+    function renderLoop() {
+      updatePhysics();
+      render();
+    }
+
+    // Start in Zone 0
+    initZone(0);
+    renderLoop();
+  </script>
+</body>
+</html>
