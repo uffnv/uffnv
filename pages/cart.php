@@ -1,15 +1,16 @@
 <?php
 // pages/cart.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/header.php';
 
 $sessId = session_id();
 
 // Получаем товары
-$sql = "SELECT c.id as cart_id, c.quantity, p.id as product_id, p.title, p.price, p.image, p.old_price 
+$sql = "SELECT c.id as cart_id, c.quantity, p.id as product_id, p.title, p.price, p.image, p.old_price
         FROM cart c
-        JOIN products p ON c.product_id = p.id
+        JOIN products p ON c.product_id = p.id AND p.is_active = 1
         WHERE c.session_id = ?
         ORDER BY c.created_at DESC";
 $stmt = $pdo->prepare($sql);
@@ -18,44 +19,17 @@ $cartItems = $stmt->fetchAll();
 
 // Итог
 $total = 0;
-foreach($cartItems as $item) {
-    $total += $item['price'] * $item['quantity'];
+foreach ($cartItems as $item) {
+    $total += (float)$item['price'] * (int)$item['quantity'];
 }
 ?>
 
 <style>
     /* === ШРИФТЫ И ЦВЕТА (ОБЩИЙ СТИЛЬ) === */
-    body { 
-        font-family: 'Arial', sans-serif; 
-        background: #120024; 
-        color: #fff; 
-    }
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
+    body {
+        font-family: 'Arial', sans-serif;
+        background: #120024;
+        color: #fff;
     }
 
     /* === КАРТОЧКА ТОВАРА === */
@@ -159,59 +133,69 @@ foreach($cartItems as $item) {
                             
                             <!-- ФОТО -->
                             <div class="col-4 col-md-3 border-end border-3 border-dark position-relative" style="max-width: 140px; height: 140px;">
-                                <a href="/pages/product.php?id=<?= $item['product_id'] ?>" class="cart-img-wrapper h-100">
-                                    <img src="<?= htmlspecialchars($item['image']) ?>" 
-                                         class="w-100 h-100 object-fit-cover" 
-                                         alt="<?= htmlspecialchars($item['title']) ?>">
+                                <a href="/pages/product.php?id=<?= (int)$item['product_id'] ?>" class="cart-img-wrapper h-100">
+                                    <img src="<?= e(safeUrl($item['image'] ?? '', '')) ?>"
+                                         class="w-100 h-100 object-fit-cover"
+                                         alt="<?= e($item['title']) ?>">
                                 </a>
                             </div>
 
                             <!-- ИНФО -->
                             <div class="col-8 col-md-9">
                                 <div class="card-body h-100 d-flex flex-column justify-content-between py-3 px-3 px-md-4">
-                                    
+
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div class="me-3 overflow-hidden w-100">
-                                            <a href="/pages/product.php?id=<?= $item['product_id'] ?>" 
-                                               class="d-inline-block text-decoration-none px-2 py-1 mb-1 small-title-link text-truncate border border-black" 
+                                            <a href="/pages/product.php?id=<?= (int)$item['product_id'] ?>"
+                                               class="d-inline-block text-decoration-none px-2 py-1 mb-1 small-title-link text-truncate border border-black"
                                                style="max-width: 100%;">
-                                                <?= htmlspecialchars($item['title']) ?>
+                                                <?= e($item['title']) ?>
                                             </a>
-                                            <?php if($item['old_price'] > 0): ?>
+                                            <?php if ($item['old_price'] > 0): ?>
                                                 <div class="text-muted text-decoration-line-through small fw-bold mt-1">
-                                                    <?= number_format($item['old_price'], 0, '', ' ') ?> ₽
+                                                    <?= number_format((float)$item['old_price'], 0, '', ' ') ?> ₽
                                                 </div>
                                             <?php endif; ?>
                                         </div>
 
-                                        <!-- Кнопка удаления -->
-                                        <a href="/actions/cart.php?action=delete&id=<?= $item['cart_id'] ?>" 
-                                           class="text-danger fs-3 lh-1 delete-btn ms-2"
-                                           title="Удалить">
-                                            <i class="bi bi-x-square-fill"></i>
-                                        </a>
+                                        <!-- Кнопка удаления (POST + CSRF) -->
+                                        <form action="/actions/cart.php" method="POST" class="ms-2">
+                                            <?= csrfField() ?>
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="cart_id" value="<?= (int)$item['cart_id'] ?>">
+                                            <button type="submit"
+                                                    class="btn btn-link p-0 text-danger fs-3 lh-1 delete-btn border-0"
+                                                    title="Удалить"
+                                                    aria-label="Удалить <?= e($item['title']) ?>">
+                                                <i class="bi bi-x-square-fill"></i>
+                                            </button>
+                                        </form>
                                     </div>
 
                                     <div class="d-flex align-items-end justify-content-between pt-2 mt-auto">
-                                        
+
                                         <!-- Кол-во -->
                                         <form action="/actions/cart.php" method="POST" class="d-flex align-items-center">
+                                            <?= csrfField() ?>
                                             <input type="hidden" name="action" value="update">
-                                            <input type="hidden" name="cart_id" value="<?= $item['cart_id'] ?>">
-                                            
+                                            <input type="hidden" name="cart_id" value="<?= (int)$item['cart_id'] ?>">
+
                                             <div class="input-group input-group-sm" style="width: 110px;">
-                                                <button type="submit" name="qty" value="<?= $item['quantity'] - 1 ?>" 
+                                                <button type="submit" name="qty" value="<?= (int)$item['quantity'] - 1 ?>"
                                                         class="btn btn-outline-dark rounded-0 border-2 fw-bold px-2"
+                                                        aria-label="Уменьшить количество"
                                                         <?= ($item['quantity'] <= 1) ? 'disabled style="opacity: 0.3;"' : '' ?>>
                                                     <i class="bi bi-dash-lg"></i>
                                                 </button>
-                                                
-                                                <input type="text" readonly 
-                                                       class="form-control rounded-0 border-2 border-dark text-center fw-black bg-white fs-6 p-0 street-font" 
-                                                       value="<?= $item['quantity'] ?>">
-                                                
-                                                <button type="submit" name="qty" value="<?= $item['quantity'] + 1 ?>" 
-                                                        class="btn btn-outline-dark rounded-0 border-2 fw-bold px-2">
+
+                                                <input type="text" readonly
+                                                       aria-label="Количество товара"
+                                                       class="form-control rounded-0 border-2 border-dark text-center fw-black bg-white fs-6 p-0 street-font"
+                                                       value="<?= (int)$item['quantity'] ?>">
+
+                                                <button type="submit" name="qty" value="<?= (int)$item['quantity'] + 1 ?>"
+                                                        class="btn btn-outline-dark rounded-0 border-2 fw-bold px-2"
+                                                        aria-label="Увеличить количество">
                                                     <i class="bi bi-plus-lg"></i>
                                                 </button>
                                             </div>
@@ -219,10 +203,10 @@ foreach($cartItems as $item) {
 
                                         <div class="text-end">
                                             <div class="street-font fs-5 lh-1 text-nowrap">
-                                                <?= number_format($item['price'] * $item['quantity'], 0, '', ' ') ?> ₽
+                                                <?= number_format((float)$item['price'] * (int)$item['quantity'], 0, '', ' ') ?> ₽
                                             </div>
                                             <small class="text-muted fw-bold d-none d-sm-block mt-1" style="font-size: 0.7rem;">
-                                                <?= number_format($item['price'], 0, '', ' ') ?> ₽/шт
+                                                <?= number_format((float)$item['price'], 0, '', ' ') ?> ₽/шт
                                             </small>
                                         </div>
 

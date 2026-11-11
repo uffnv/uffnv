@@ -1,40 +1,19 @@
 <?php
 // pages/login.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
+
+if (isset($_SESSION['user_id'])) {
+    header("Location: /pages/profile.php");
+    exit;
+}
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === КАРТОЧКА ВХОДА === */
     .login-card {
@@ -134,49 +113,50 @@ require_once __DIR__ . '/../includes/header.php';
             </p>
         </div>
 
-        <?php if(isset($_SESSION['error'])): ?>
+        <?php if (isset($_SESSION['error'])): ?>
             <div class="alert alert-danger rounded-0 border-3 border-dark fw-bold mb-4 shadow-sm text-center">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= e($_SESSION['error']); unset($_SESSION['error']); ?>
             </div>
         <?php endif; ?>
 
-        <?php if(isset($_SESSION['success'])): ?>
+        <?php if (isset($_SESSION['success'])): ?>
             <div class="alert alert-success rounded-0 border-3 border-dark fw-bold mb-4 shadow-sm text-center">
-                <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+                <i class="bi bi-check-circle-fill me-2"></i> <?= e($_SESSION['success']); unset($_SESSION['success']); ?>
             </div>
         <?php endif; ?>
 
         <form action="/actions/signin.php" method="POST">
+            <?= csrfField() ?>
             <div class="mb-4">
-                <label class="street-font small text-muted mb-2">Твой Email</label>
+                <label for="loginEmail" class="street-font small text-muted mb-2">Твой Email</label>
                 <div class="input-group">
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
                         <i class="bi bi-envelope-fill"></i>
                     </span>
-                    <input type="email" name="email" class="form-control form-control-lg rounded-0" placeholder="mail@example.com" required>
+                    <input type="email" id="loginEmail" name="email" class="form-control form-control-lg rounded-0" placeholder="mail@example.com" required autocomplete="email">
                 </div>
             </div>
 
             <div class="mb-5">
-                <label class="street-font small text-muted mb-2">Пароль</label>
+                <label for="loginPassword" class="street-font small text-muted mb-2">Пароль</label>
                 <div class="input-group">
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
                         <i class="bi bi-lock-fill"></i>
                     </span>
-                    <input type="password" name="password" class="form-control form-control-lg rounded-0" placeholder="••••••••" required>
+                    <input type="password" id="loginPassword" name="password" class="form-control form-control-lg rounded-0" placeholder="••••••••" required autocomplete="current-password">
                 </div>
             </div>
 
             <button type="submit" class="street-btn">
                 ВОЙТИ В СИСТЕМУ
             </button>
-            
-                <div class="text-center mt-4 pt-3 border-top border-dark">
-                    <span class="small fw-bold text-muted text-uppercase">Ещё нет аккаунта?</span><br>
-                    <a href="/pages/register.php" class="text-decoration-none fw-black text-dark fs-5" style="border-bottom: 3px solid #FCE300; box-shadow: inset 0 -5px 0 rgba(252, 227, 0, 0.3);">
-                        СОЗДАТЬ АККАУНТ
-                    </a>
-                </div>
+
+            <div class="text-center mt-4 pt-3 border-top border-dark">
+                <span class="small fw-bold text-muted text-uppercase">Ещё нет аккаунта?</span><br>
+                <a href="/pages/register.php" class="text-decoration-none fw-black text-dark fs-5" style="border-bottom: 3px solid #FCE300; box-shadow: inset 0 -5px 0 rgba(252, 227, 0, 0.3);">
+                    СОЗДАТЬ АККАУНТ
+                </a>
+            </div>
         </form>
     </div>
 

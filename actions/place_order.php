@@ -1,109 +1,114 @@
 <?php
 // actions/place_order.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-// Если скрипт вызван не через форму - выкидываем
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: /catalog.php");
+    header("Location: /pages/catalog.php");
     exit;
 }
 
-// 1. ПОЛУЧЕНИЕ ДАННЫХ ИЗ ФОРМЫ (pages/checkout.php)
-$name = trim($_POST['name']);
-$phone = trim($_POST['phone']);
-$email = trim($_POST['email']);
-$city = trim($_POST['city']);       // Поле города
-$address = trim($_POST['address']); // Поле улицы/дома
-$comment = trim($_POST['comment']);
-$payment = $_POST['payment_method'];
+requireCsrfOrRedirect('/pages/checkout.php');
 
-// Объединяем Город и Адрес в одну строку для базы данных
+$name    = trim($_POST['name'] ?? '');
+$phone   = trim($_POST['phone'] ?? '');
+$email   = trim($_POST['email'] ?? '');
+$city    = trim($_POST['city'] ?? '');
+$address = trim($_POST['address'] ?? '');
+$comment = trim($_POST['comment'] ?? '');
+$payment = $_POST['payment_method'] ?? '';
+$consent = isset($_POST['checkout_pd_consent']) ? 1 : 0;
+
+if ($consent !== 1) {
+    redirectWithFlash('/pages/checkout.php', 'Необходимо подтвердить согласие на обработку персональных данных.', 'danger');
+}
+
+$phoneDigits = preg_replace('/\D+/', '', $phone);
+if ($name === '' || mb_strlen($phoneDigits) < 10 || !filter_var($email, FILTER_VALIDATE_EMAIL) || $city === '' || $address === '') {
+    redirectWithFlash('/pages/checkout.php', 'Проверьте заполнение ФИО, телефона (10+ цифр), Email, города и адреса.', 'danger');
+}
+
+if (!in_array($payment, ['card', 'cash'], true)) {
+    redirectWithFlash('/pages/checkout.php', 'Выберите корректный способ оплаты.', 'danger');
+}
+
 $fullAddress = $city . ', ' . $address;
-
 $sessId = session_id();
 
-// 2. ПОЛУЧАЕМ СОДЕРЖИМОЕ КОРЗИНЫ
-// Нам нужны ID товара, цена и картинка (если понадобится)
-$sql = "SELECT c.quantity, p.id as product_id, p.price, p.title 
-        FROM cart c 
-        JOIN products p ON c.product_id = p.id 
-        WHERE c.session_id = ?";
+$sql = "SELECT c.quantity, p.id as product_id, p.price, p.title
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        WHERE c.session_id = ? AND p.is_active = 1";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$sessId]);
 $cartItems = $stmt->fetchAll();
 
 if (empty($cartItems)) {
-    die("Ошибка: Ваша корзина пуста.");
+    redirectWithFlash('/pages/cart.php', 'Ваша корзина пуста или товары сняты с продажи.', 'warning');
 }
 
-// 3. РАСЧЕТ ОБЩЕЙ СУММЫ
 $totalAmount = 0;
-foreach($cartItems as $item) {
-    $totalAmount += $item['price'] * $item['quantity'];
+foreach ($cartItems as $item) {
+    $qty = max(1, (int)$item['quantity']);
+    $totalAmount += ((float)$item['price']) * $qty;
 }
 
 try {
-    // Начинаем транзакцию (чтобы всё записалось или ничего)
     $pdo->beginTransaction();
 
-    // 4. ОПРЕДЕЛЯЕМ ПОЛЬЗОВАТЕЛЯ
-    $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+    $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
 
-    // Если пользователь авторизован, можно обновить его телефон, если он пустой
     if ($userId) {
-        $checkStmt = $pdo->prepare("SELECT phone FROM users WHERE id = ?");
+        $checkStmt = $pdo->prepare("SELECT phone FROM users WHERE id = ? LIMIT 1");
         $checkStmt->execute([$userId]);
         $uData = $checkStmt->fetch();
-        if (empty($uData['phone']) && !empty($phone)) {
+        if ($uData && empty($uData['phone']) && $phone !== '') {
             $pdo->prepare("UPDATE users SET phone = ? WHERE id = ?")->execute([$phone, $userId]);
         }
     }
 
-    // 5. СОЗДАЕМ ЗАКАЗ (Таблица orders)
-    // Вставляем объединенный адрес $fullAddress
-    $orderSql = "INSERT INTO orders (user_id, name, phone, email, address, total_amount, payment_method, comment) 
+    $orderSql = "INSERT INTO orders (user_id, name, phone, email, address, total_amount, payment_method, comment)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     $pdo->prepare($orderSql)->execute([
-        $userId, 
-        $name, 
-        $phone, 
-        $email, 
-        $fullAddress, // Сохраняем "Москва, ул. Пушкина..."
-        $totalAmount, 
-        $payment, 
-        $comment
+        $userId,
+        $name,
+        $phone,
+        $email,
+        $fullAddress,
+        $totalAmount,
+        $payment,
+        $comment,
     ]);
-    
-    // Получаем ID только что созданного заказа
-    $orderId = $pdo->lastInsertId();
 
-    // 6. СОХРАНЯЕМ ПОЗИЦИИ ЗАКАЗА (Таблица order_items)
-    // Это нужно для модального окна просмотра состава заказа
+    $orderId = (int)$pdo->lastInsertId();
+
     $itemSql = "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
     $itemStmt = $pdo->prepare($itemSql);
-
     foreach ($cartItems as $cItem) {
         $itemStmt->execute([
-            $orderId, 
-            $cItem['product_id'], 
-            $cItem['quantity'], 
-            $cItem['price'] // Фиксируем цену на момент покупки
+            $orderId,
+            $cItem['product_id'],
+            max(1, (int)$cItem['quantity']),
+            $cItem['price'],
         ]);
     }
 
-    // 7. ОЧИЩАЕМ КОРЗИНУ ПОЛЬЗОВАТЕЛЯ
     $pdo->prepare("DELETE FROM cart WHERE session_id = ?")->execute([$sessId]);
-
-    // Применяем все изменения
     $pdo->commit();
 
-    // 8. ПЕРЕНАПРАВЛЕНИЕ НА УСПЕХ
-    header("Location: /pages/order_success.php?id=$orderId");
-    exit;
+    // Сохраняем в сессию список недавно оформленных заказов (защита от IDOR на order_success.php для гостей)
+    if (!isset($_SESSION['allowed_order_ids']) || !is_array($_SESSION['allowed_order_ids'])) {
+        $_SESSION['allowed_order_ids'] = [];
+    }
+    $_SESSION['allowed_order_ids'][] = $orderId;
 
-} catch (Exception $e) {
-    // Если ошибка - отменяем всё
-    $pdo->rollBack();
-    die("Ошибка при оформлении заказа: " . $e->getMessage());
+    header("Location: /pages/order_success.php?id=" . $orderId);
+    exit;
+} catch (\Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log("Place order error: " . $e->getMessage());
+    redirectWithFlash('/pages/checkout.php', 'Ошибка при оформлении заказа. Попробуйте позже.', 'danger');
 }

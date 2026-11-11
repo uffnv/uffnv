@@ -1,23 +1,42 @@
-<?php require_once 'layout_header.php'; ?>
-
 <?php
-// ОБРАБОТКА ФОРМЫ
+// admin/forum_sections.php
+require_once __DIR__ . '/admin_auth.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrfOrRedirect('/admin/forum_sections.php');
+
     if (isset($_POST['add_section'])) {
-        $stmt = $pdo->prepare("INSERT INTO sections (title, sort_order) VALUES (?, ?)");
-        $stmt->execute([$_POST['title'], (int)$_POST['sort_order']]);
+        $title = trim($_POST['title'] ?? '');
+        $sortOrder = (int)($_POST['sort_order'] ?? 0);
+        if ($title !== '') {
+            $pdo->prepare("INSERT INTO sections (title, sort_order) VALUES (?, ?)")->execute([$title, $sortOrder]);
+            redirectWithFlash('/admin/forum_sections.php', 'Раздел создан.', 'success');
+        }
     }
+
     if (isset($_POST['delete_section'])) {
-        // Сбрасываем категории в NULL перед удалением раздела
-        $pdo->prepare("UPDATE categories SET section_id = NULL WHERE section_id = ?")->execute([(int)$_POST['id']]);
-        $pdo->prepare("DELETE FROM sections WHERE id = ?")->execute([(int)$_POST['id']]);
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $pdo->prepare("UPDATE categories SET section_id = NULL WHERE section_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM sections WHERE id = ?")->execute([$id]);
+            redirectWithFlash('/admin/forum_sections.php', 'Раздел удалён.', 'warning');
+        }
     }
+
     if (isset($_POST['edit_section'])) {
-        $stmt = $pdo->prepare("UPDATE sections SET title = ?, sort_order = ? WHERE id = ?");
-        $stmt->execute([$_POST['title'], (int)$_POST['sort_order'], (int)$_POST['id']]);
+        $id = (int)($_POST['id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+        $sortOrder = (int)($_POST['sort_order'] ?? 0);
+        if ($id > 0 && $title !== '') {
+            $pdo->prepare("UPDATE sections SET title = ?, sort_order = ? WHERE id = ?")->execute([$title, $sortOrder, $id]);
+            redirectWithFlash('/admin/forum_sections.php', 'Раздел обновлён.', 'success');
+        }
     }
+
+    redirectWithFlash('/admin/forum_sections.php', 'Проверьте название раздела.', 'danger');
 }
 
+require_once __DIR__ . '/layout_header.php';
 $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetchAll();
 ?>
 
@@ -26,27 +45,26 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
 </div>
 
 <div class="row">
-    <!-- ФОРМА ДОБАВЛЕНИЯ -->
     <div class="col-md-4">
         <div class="admin-card">
             <div class="admin-header">Создать раздел</div>
             <div class="p-3">
                 <form method="POST">
+                    <?= csrfField() ?>
                     <div class="mb-3">
-                        <label class="fw-bold small">Название</label>
-                        <input type="text" name="title" class="form-control" required>
+                        <label for="secTitle" class="fw-bold small">Название</label>
+                        <input id="secTitle" type="text" name="title" class="form-control" required>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Порядок (сортировка)</label>
-                        <input type="number" name="sort_order" class="form-control" value="0">
+                        <label for="secSort" class="fw-bold small">Порядок (сортировка)</label>
+                        <input id="secSort" type="number" name="sort_order" class="form-control" value="0">
                     </div>
-                    <button type="submit" name="add_section" class="btn btn-admin btn-admin-primary w-100">Добавить</button>
+                    <button type="submit" name="add_section" value="1" class="btn btn-admin btn-admin-primary w-100">Добавить</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- СПИСОК -->
     <div class="col-md-8">
         <div class="admin-card">
             <div class="admin-header">Список разделов</div>
@@ -61,17 +79,17 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach($sections as $s): ?>
+                        <?php foreach ($sections as $s):
+                            $fid = 'secForm' . (int)$s['id'];
+                        ?>
                         <tr>
-                            <form method="POST">
-                                <td>#<?= $s['id'] ?><input type="hidden" name="id" value="<?= $s['id'] ?>"></td>
-                                <td><input type="text" name="title" class="form-control form-control-sm" value="<?= htmlspecialchars($s['title']) ?>"></td>
-                                <td><input type="number" name="sort_order" class="form-control form-control-sm" value="<?= $s['sort_order'] ?>" style="width: 70px;"></td>
-                                <td>
-                                    <button type="submit" name="edit_section" class="btn btn-sm btn-admin btn-admin-dark" title="Сохранить"><i class="bi bi-save"></i></button>
-                                    <button type="submit" name="delete_section" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить?')" title="Удалить"><i class="bi bi-trash"></i></button>
-                                </td>
-                            </form>
+                            <td>#<?= (int)$s['id'] ?></td>
+                            <td><input form="<?= $fid ?>" type="text" name="title" class="form-control form-control-sm" value="<?= e($s['title']) ?>" required aria-label="Название раздела"></td>
+                            <td><input form="<?= $fid ?>" type="number" name="sort_order" class="form-control form-control-sm" value="<?= (int)$s['sort_order'] ?>" style="width: 70px;" aria-label="Порядок сортировки"></td>
+                            <td>
+                                <button form="<?= $fid ?>" type="submit" name="edit_section" value="1" class="btn btn-sm btn-admin btn-admin-dark" title="Сохранить" aria-label="Сохранить"><i class="bi bi-save" aria-hidden="true"></i></button>
+                                <button form="<?= $fid ?>" type="submit" name="delete_section" value="1" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить раздел?')" title="Удалить" aria-label="Удалить"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -81,4 +99,11 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
     </div>
 </div>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php foreach ($sections as $s): ?>
+    <form method="POST" id="secForm<?= (int)$s['id'] ?>" class="d-none">
+        <?= csrfField() ?>
+        <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+    </form>
+<?php endforeach; ?>
+
+<?php require_once __DIR__ . '/layout_footer.php'; ?>

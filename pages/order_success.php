@@ -1,53 +1,28 @@
 <?php
 // pages/order_success.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/header.php';
 
 $orderId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Получаем инфо о заказе
 $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ?");
 $stmt->execute([$orderId]);
-$order = $stmt->fetch();
+$order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$order) {
-    echo "<script>window.location='/pages/catalog.php';</script>";
-    exit;
+$isOwner = $order && isset($_SESSION['user_id']) && $order['user_id'] !== null && (int)$order['user_id'] === (int)$_SESSION['user_id'];
+$inSessionOrders = $order && in_array($orderId, $_SESSION['allowed_order_ids'] ?? [], true);
+
+if (!$order || (!$isOwner && !$inSessionOrders && !isAdmin())) {
+    redirectWithFlash('/pages/catalog.php', 'Заказ не найден или доступ ограничен.', 'warning');
 }
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === SUCCESS CARD === */
     .success-card {
@@ -134,9 +109,9 @@ if (!$order) {
 
                     <!-- Заголовок -->
                     <h1 class="display-4 street-font mb-3 text-dark">
-                        ЗАКАЗ <span class="text-street-yellow" style="text-shadow: 2px 2px 0 #000; text-decoration: underline;">#<?= $orderId ?></span> ПРИНЯТ
+                        ЗАКАЗ <span class="text-street-yellow" style="text-shadow: 2px 2px 0 #000; text-decoration: underline;">#<?= (int)$orderId ?></span> ПРИНЯТ
                     </h1>
-                    
+
                     <p class="lead fw-bold text-muted mb-5 text-uppercase street-font" style="letter-spacing: 1px;">
                         Спасибо, бро! Мы уже собираем твой стаф.
                     </p>
@@ -145,11 +120,11 @@ if (!$order) {
                     <div class="ticket-details p-4 mb-5 mx-auto text-start" style="max-width: 500px;">
                         <div class="d-flex justify-content-between mb-2 border-bottom border-dark pb-2">
                             <span class="text-uppercase fw-bold text-muted small street-font">К оплате:</span>
-                            <span class="street-font fs-4 text-dark"><?= number_format($order['total_amount'], 0, '', ' ') ?> ₽</span>
+                            <span class="street-font fs-4 text-dark"><?= number_format((float)$order['total_amount'], 0, '', ' ') ?> ₽</span>
                         </div>
                         <div class="d-flex justify-content-between pt-2">
                             <span class="text-uppercase fw-bold text-muted small street-font">Телефон для связи:</span>
-                            <span class="fw-bold fs-5 text-dark"><?= htmlspecialchars($order['phone']) ?></span>
+                            <span class="fw-bold fs-5 text-dark"><?= e($order['phone']) ?></span>
                         </div>
                         
                         <div class="mt-4 pt-3 border-top border-dark text-center small fw-bold text-muted text-uppercase">

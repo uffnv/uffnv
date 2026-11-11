@@ -1,41 +1,23 @@
 ﻿<?php
 // pages/register.php
-session_start();
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 
-// Если пользователь уже авторизован — редирект
 if (isset($_SESSION['user_id'])) {
-    echo "<script>window.location.href='/pages/profile.php';</script>";
+    header("Location: /pages/profile.php");
     exit;
 }
 
-// Получаем ошибки из сессии
 $errors = $_SESSION['errors'] ?? [];
 $old = $_SESSION['old'] ?? [];
 unset($_SESSION['errors'], $_SESSION['old']);
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-    /* === ФОН NEON GRID === */
+    /* === ФОН И БАЗА === */
     body { background: #120024; color: #fff; }
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === AUTH CARD === */
     .auth-container {
@@ -173,47 +155,53 @@ unset($_SESSION['errors'], $_SESSION['old']);
         </div>
 
         <div class="p-4 p-md-5">
-            <form method="POST" action="/actions/signup.php" novalidate>
-                
+            <?php if (!empty($errors['general'])): ?>
+                <div class="alert alert-danger rounded-0 border-3 border-dark fw-bold mb-3">
+                    <?= e($errors['general']) ?>
+                </div>
+            <?php endif; ?>
+            <form method="POST" action="/actions/signup.php">
+                <?= csrfField() ?>
+
                 <div class="mb-3">
-                    <label class="street-label">Никнейм</label>
-                    <input type="text" name="username" 
-                           class="form-control street-input <?= isset($errors['username']) ? 'is-invalid' : '' ?>" 
+                    <label for="regUsername" class="street-label">Никнейм</label>
+                    <input type="text" id="regUsername" name="username" required minlength="3" maxlength="32"
+                           class="form-control street-input <?= isset($errors['username']) ? 'is-invalid' : '' ?>"
                            placeholder="Придумай имя"
-                           value="<?= htmlspecialchars($old['username'] ?? '') ?>">
+                           value="<?= e($old['username'] ?? '') ?>">
                     <?php if (isset($errors['username'])): ?>
-                        <div class="street-error"><?= $errors['username'] ?></div>
+                        <div class="street-error"><?= e($errors['username']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-3">
-                    <label class="street-label">Email</label>
-                    <input type="email" name="email" 
-                           class="form-control street-input <?= isset($errors['email']) ? 'is-invalid' : '' ?>" 
+                    <label for="regEmail" class="street-label">Email</label>
+                    <input type="email" id="regEmail" name="email" required
+                           class="form-control street-input <?= isset($errors['email']) ? 'is-invalid' : '' ?>"
                            placeholder="name@example.com"
-                           value="<?= htmlspecialchars($old['email'] ?? '') ?>">
+                           value="<?= e($old['email'] ?? '') ?>">
                     <?php if (isset($errors['email'])): ?>
-                        <div class="street-error"><?= $errors['email'] ?></div>
+                        <div class="street-error"><?= e($errors['email']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-3">
-                    <label class="street-label">Пароль</label>
-                    <input type="password" name="password" 
+                    <label for="regPassword" class="street-label">Пароль</label>
+                    <input type="password" id="regPassword" name="password" required minlength="6"
                            class="form-control street-input <?= isset($errors['password']) ? 'is-invalid' : '' ?>"
-                           placeholder="Минимум 6 символов">
+                           placeholder="Минимум 6 символов" autocomplete="new-password">
                     <?php if (isset($errors['password'])): ?>
-                        <div class="street-error"><?= $errors['password'] ?></div>
+                        <div class="street-error"><?= e($errors['password']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-4">
-                    <label class="street-label">Подтверждение</label>
-                    <input type="password" name="password_confirm" 
+                    <label for="regPasswordConfirm" class="street-label">Подтверждение</label>
+                    <input type="password" id="regPasswordConfirm" name="password_confirm" required minlength="6"
                            class="form-control street-input <?= isset($errors['password_confirm']) ? 'is-invalid' : '' ?>"
-                           placeholder="Повтори пароль">
+                           placeholder="Повтори пароль" autocomplete="new-password">
                     <?php if (isset($errors['password_confirm'])): ?>
-                        <div class="street-error"><?= $errors['password_confirm'] ?></div>
+                        <div class="street-error"><?= e($errors['password_confirm']) ?></div>
                     <?php endif; ?>
                 </div>
 
@@ -221,11 +209,14 @@ unset($_SESSION['errors'], $_SESSION['old']);
                     <div class="d-flex align-items-start gap-2">
                         <input type="checkbox" name="data_consent" id="data_consent" class="street-checkbox" required>
                         <label for="data_consent" class="small fw-bold text-dark text-uppercase" style="font-size: 0.7rem; line-height: 1.3;">
-                            Я даю согласие на обработку персональных данных в соответствии с 
-                            <a href="/pages/privacy.php" target="_blank" class="text-dark text-decoration-underline fw-black">Политикой конфиденциальности (152-ФЗ)</a> 
+                            Я даю согласие на обработку персональных данных в соответствии с
+                            <a href="/pages/privacy.php" target="_blank" class="text-dark text-decoration-underline fw-black">Политикой конфиденциальности (152-ФЗ)</a>
                             и принимаю условия <a href="/pages/terms.php" target="_blank" class="text-dark text-decoration-underline fw-black">Пользовательского соглашения</a>.
                         </label>
                     </div>
+                    <?php if (isset($errors['data_consent'])): ?>
+                        <div class="street-error"><?= e($errors['data_consent']) ?></div>
+                    <?php endif; ?>
                     <div class="d-flex align-items-start gap-2 mt-1">
                         <input type="checkbox" name="promo_consent" id="promo_consent" class="street-checkbox">
                         <label for="promo_consent" class="small text-muted text-uppercase" style="font-size: 0.65rem; line-height: 1.2;">

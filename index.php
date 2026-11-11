@@ -1,32 +1,34 @@
 <?php
 // index.php
-session_start();
+require_once __DIR__ . '/includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/config/db.php';
 
-// === ПОДКЛЮЧАЕМ ВАШ ХЕДЕР ===
+// === ПОДКЛЮЧАЕМ ХЕДЕР ===
+$pageTitle = 'Главная';
 require_once __DIR__ . '/includes/header.php';
 
-// Загрузка топиков
+// Загрузка популярных одобренных топиков
 try {
-    $sqlTop = "SELECT t.*, u.username, c.name as cat_title, 
-               (SELECT COUNT(*) FROM posts WHERE topic_id = t.id) as replies_count 
-               FROM topics t 
-               JOIN users u ON t.user_id = u.id 
-               JOIN categories c ON t.category_id = c.id 
-               ORDER BY replies_count DESC LIMIT 3";
+    $sqlTop = "SELECT t.*, u.username, c.title as cat_title,
+               (SELECT COUNT(*) FROM posts WHERE topic_id = t.id) as replies_count
+               FROM topics t
+               LEFT JOIN users u ON t.user_id = u.id
+               LEFT JOIN categories c ON t.category_id = c.id
+               WHERE t.is_approved = 1
+               ORDER BY replies_count DESC, t.created_at DESC
+               LIMIT 3";
     $topTopics = $pdo->query($sqlTop)->fetchAll();
-} catch (PDOException $e) { $topTopics = []; }
+} catch (\PDOException $e) {
+    error_log("Index top topics error: " . $e->getMessage());
+    $topTopics = [];
+}
 ?>
 
 <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 
 <style>
-    /* === 1. ФИКС ФУТЕРА И ХЕДЕРА === */
-    
-    /* Скрываем отступ, который зашит в footer.php */
-    body + div[style*="margin-top: 100px"], 
-    div[style*="margin-top: 100px"] { display: none !important; }
-
+    /* === 1. ФИКС ХЕДЕРА НА ГЛАВНОЙ === */
     /* Умный хедер */
     .street-header {
         transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -338,13 +340,13 @@ try {
                     <p class="text-white mb-5 fw-bold" style="max-width: 600px; margin: 0 auto; text-shadow: 0 2px 2px #000;">
                         Персональная лента, собранная алгоритмом специально для тебя. <br>Вход в матрицу здесь.
                     </p>
-                    <?php if(isset($_SESSION['user_id'])): ?>
+                    <?php if(!empty($_SESSION['user_id'])): ?>
                         <div class="d-flex justify-content-center flex-column align-items-center">
                             <a href="/personal/" class="btn-street btn-cyber px-5 py-3 fs-4 rounded-0">ЗАПУСТИТЬ ЛЕНТУ</a>
                         </div>
                     <?php else: ?>
                         <div class="d-flex justify-content-center flex-column align-items-center">
-                            <a href="pages/login.php" class="btn-street btn-cyber px-5 py-3 fs-4 rounded-0">ИДЕНТИФИКАЦИЯ</a>
+                            <a href="/pages/login.php" class="btn-street btn-cyber px-5 py-3 fs-4 rounded-0">ИДЕНТИФИКАЦИЯ</a>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -352,50 +354,75 @@ try {
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-hero')" class="scroll-btn"><i class="bi bi-arrow-up-circle-fill"></i></button>
+        <button type="button" onclick="smoothScroll('section-hero')" class="scroll-btn" aria-label="Наверх"><i class="bi bi-arrow-up-circle-fill" aria-hidden="true"></i></button>
     </div>
 </div>
 
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script>
-    // Плавный скролл
     function smoothScroll(id) {
         const element = document.getElementById(id);
         if (element) { element.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     }
-    
-    // Умный хедер
+
     let lastScrollTop = 0;
     const header = document.querySelector('.street-header');
     window.addEventListener('scroll', function() {
-        let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        if (scrollTop > lastScrollTop && scrollTop > 100) {
-            header.classList.add('header-hidden');
-        } else {
-            header.classList.remove('header-hidden');
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        if (header) {
+            if (scrollTop > lastScrollTop && scrollTop > 100) {
+                header.classList.add('header-hidden');
+            } else {
+                header.classList.remove('header-hidden');
+            }
         }
-        lastScrollTop = scrollTop;
+        lastScrollTop = Math.max(0, scrollTop);
     });
 
     document.addEventListener('DOMContentLoaded', function() {
         AOS.init({ once: true, offset: 50, duration: 600, easing: 'ease-out' });
-        
-        // Матрица на фоне форума
+
         const canvas = document.getElementById('matrixCanvas');
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            function resizeCanvas() { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; }
-            resizeCanvas(); window.addEventListener('resize', resizeCanvas);
-            const alphabet = '01'; const fontSize = 16; const columns = canvas.width / fontSize; const drops = [];
-            for(let x = 0; x < columns; x++) drops[x] = 1;
+            const alphabet = '01';
+            const fontSize = 16;
+            let drops = [];
+
+            function resizeCanvas() {
+                canvas.width = canvas.parentElement.offsetWidth;
+                canvas.height = canvas.parentElement.offsetHeight;
+                const columns = Math.max(1, Math.floor(canvas.width / fontSize));
+                drops = Array.from({ length: columns }, () => 1);
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
             function drawMatrix() {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#0F0'; ctx.font = fontSize + 'px monospace';
-                for(let i = 0; i < drops.length; i++) {
-                    const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length)); ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                    if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0; drops[i]++;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#0F0';
+                ctx.font = fontSize + 'px monospace';
+                for (let i = 0; i < drops.length; i++) {
+                    const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                    drops[i]++;
                 }
             }
-            setInterval(drawMatrix, 50);
+
+            let matrixTimer = null;
+            const startMatrix = () => { if (!matrixTimer) matrixTimer = setInterval(drawMatrix, 50); };
+            const stopMatrix = () => { if (matrixTimer) { clearInterval(matrixTimer); matrixTimer = null; } };
+
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => entry.isIntersecting ? startMatrix() : stopMatrix());
+                }, { threshold: 0.05 });
+                observer.observe(canvas);
+            } else {
+                startMatrix();
+            }
         }
     });
 </script>

@@ -1,47 +1,38 @@
 <?php
 // admin/layout_header.php
-if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../config/db.php';
-
-// Проверка админа (Ваш оригинальный код)
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'super_admin')) {
-    header("Location: /pages/login.php");
-    exit;
-}
+require_once __DIR__ . '/admin_auth.php';
+$curAdminPage = basename($_SERVER['PHP_SELF']);
+$csrfToken = getCsrfToken();
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUPER ADMIN PANEL</title>
-    <!-- Bootstrap 5 CSS -->
+    <meta name="csrf-token" content="<?= e($csrfToken) ?>">
+    <title>SUPER ADMIN PANEL — UFFNV</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
+
     <style>
         body {
             font-family: 'Arial', sans-serif;
             background: #f4f4f4;
-            overflow-x: hidden; /* Скрываем гориз. скролл */
+            overflow-x: hidden;
         }
-        
+        .fw-black { font-weight: 900 !important; }
         .street-font {
             font-family: 'Arial Black', 'Impact', sans-serif;
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
-        /* --- SIDEBAR --- */
         .admin-sidebar {
             width: 280px;
             min-height: 100vh;
             background: #000;
             color: #fff;
             border-right: 5px solid #FCE300;
-            /* Анимация для мобильных */
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1050;
             flex-shrink: 0;
@@ -67,11 +58,9 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION[
             border-bottom: 5px solid #FCE300;
             text-align: center;
         }
-
-        /* --- CONTENT STYLES --- */
         .admin-card {
             border: 3px solid #000;
-            box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
             background: #fff;
             margin-bottom: 20px;
         }
@@ -82,24 +71,19 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION[
             font-family: 'Arial Black', sans-serif;
             text-transform: uppercase;
         }
-        
-        /* --- BUTTONS & FORMS --- */
         .btn-admin { border: 2px solid #000; border-radius: 0; font-weight: bold; text-transform: uppercase; box-shadow: 3px 3px 0 #000; }
         .btn-admin:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #000; }
         .btn-admin-primary { background: #FCE300; color: #000; }
         .btn-admin-danger { background: #dc3545; color: #fff; }
         .btn-admin-dark { background: #000; color: #fff; }
-
         .form-control, .form-select { border: 2px solid #000; border-radius: 0; }
-        .form-control:focus { box-shadow: none; border-color: #FCE300; background: #fff9db; }
-        
+        .form-control:focus, .form-select:focus { box-shadow: none; border-color: #FCE300; background: #fff9db; }
         .table-admin { border: 2px solid #000; }
         .table-admin th { background: #000; color: #fff; text-transform: uppercase; }
         .table-admin td { vertical-align: middle; border-bottom: 1px solid #ddd; }
 
-        /* --- MOBILE ADAPTATION --- */
         .mobile-toggle-btn {
-            display: none; /* Скрыта на ПК */
+            display: none;
             position: fixed;
             top: 15px;
             left: 15px;
@@ -112,107 +96,93 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION[
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
             font-size: 1.5rem;
         }
-        
         .sidebar-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             z-index: 1040;
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s;
             backdrop-filter: blur(2px);
         }
-        
-        .sidebar-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Только для экранов меньше 992px (планшеты и мобильные) */
+        .sidebar-overlay.active { opacity: 1; visibility: visible; }
         @media (max-width: 991.98px) {
-            .mobile-toggle-btn {
-                display: flex;
-            }
+            .mobile-toggle-btn { display: flex; }
             .admin-sidebar {
                 position: fixed;
                 top: 0;
-                left: -290px; /* Скрыт за экраном */
+                left: -290px;
                 height: 100vh;
-                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+                box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
             }
-            .admin-sidebar.show {
-                left: 0; /* Выезжает */
-            }
-            /* Отступ контента сверху, чтобы текст не был под кнопкой */
-            .content-wrapper {
-                padding-top: 80px !important; 
-            }
+            .admin-sidebar.show { left: 0; }
+            .content-wrapper { padding-top: 80px !important; }
         }
     </style>
 </head>
 <body>
 
 <div class="d-flex" style="min-height: 100vh;">
-    
-    <!-- MOBILE MENU BUTTON (SQUARE) -->
-    <div class="mobile-toggle-btn" onclick="toggleSidebar()">
-        <i class="bi bi-list"></i>
-    </div>
-
-    <!-- OVERLAY -->
+    <button type="button" class="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Открыть меню админки">
+        <i class="bi bi-list" aria-hidden="true"></i>
+    </button>
     <div class="sidebar-overlay" onclick="toggleSidebar()" id="sidebarOverlay"></div>
 
-    <!-- SIDEBAR -->
     <div class="admin-sidebar d-flex flex-column flex-shrink-0 p-0" id="adminSidebar">
         <div class="brand street-font">
-            <i class="bi bi-shield-lock-fill"></i> ADMIN
+            <i class="bi bi-shield-lock-fill" aria-hidden="true"></i> ADMIN
         </div>
-        
-        <!-- Ссылки (восстановлены в соответствии с вашим оригиналом) -->
-        <a href="/admin/index.php" class="<?= $_SERVER['PHP_SELF'] == '/admin/index.php' ? 'active' : '' ?>">
-            <i class="bi bi-speedometer2 me-2"></i> Главная
+
+        <a href="/admin/index.php" class="<?= $curAdminPage === 'index.php' ? 'active' : '' ?>">
+            <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i> Главная
         </a>
-        
+
         <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Форум</div>
-        <a href="/admin/forum_sections.php" class="<?= strpos($_SERVER['PHP_SELF'], 'forum_sections') ? 'active' : '' ?>">
-            <i class="bi bi-collection-fill me-2"></i> Разделы
+        <a href="/admin/forum_sections.php" class="<?= $curAdminPage === 'forum_sections.php' ? 'active' : '' ?>">
+            <i class="bi bi-collection-fill me-2" aria-hidden="true"></i> Разделы
         </a>
-        <a href="/admin/forum_categories.php" class="<?= strpos($_SERVER['PHP_SELF'], 'forum_categories') ? 'active' : '' ?>">
-            <i class="bi bi-folder-fill me-2"></i> Категории
+        <a href="/admin/forum_categories.php" class="<?= $curAdminPage === 'forum_categories.php' ? 'active' : '' ?>">
+            <i class="bi bi-folder-fill me-2" aria-hidden="true"></i> Категории
         </a>
-        <a href="/admin/topics.php" class="<?= strpos($_SERVER['PHP_SELF'], 'topics') ? 'active' : '' ?>">
-            <i class="bi bi-chat-left-text-fill me-2"></i> Темы
+        <a href="/admin/topics.php" class="<?= $curAdminPage === 'topics.php' ? 'active' : '' ?>">
+            <i class="bi bi-chat-left-text-fill me-2" aria-hidden="true"></i> Темы
         </a>
 
         <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Магазин</div>
-        <a href="/admin/shop_categories.php" class="<?= strpos($_SERVER['PHP_SELF'], 'shop_categories') ? 'active' : '' ?>">
-            <i class="bi bi-tags-fill me-2"></i> Категории товаров
+        <a href="/admin/shop_categories.php" class="<?= $curAdminPage === 'shop_categories.php' ? 'active' : '' ?>">
+            <i class="bi bi-tags-fill me-2" aria-hidden="true"></i> Категории товаров
         </a>
-        <a href="/admin/products.php" class="<?= strpos($_SERVER['PHP_SELF'], 'products') ? 'active' : '' ?>">
-            <i class="bi bi-box-seam-fill me-2"></i> Товары
+        <a href="/admin/products.php" class="<?= in_array($curAdminPage, ['products.php', 'product_edit.php'], true) ? 'active' : '' ?>">
+            <i class="bi bi-box-seam-fill me-2" aria-hidden="true"></i> Товары
         </a>
-        <a href="/admin/orders.php" class="<?= strpos($_SERVER['PHP_SELF'], 'orders') ? 'active' : '' ?>">
-            <i class="bi bi-cart-check-fill me-2"></i> Заказы
+        <a href="/admin/orders.php" class="<?= in_array($curAdminPage, ['orders.php', 'order_view.php'], true) ? 'active' : '' ?>">
+            <i class="bi bi-cart-check-fill me-2" aria-hidden="true"></i> Заказы
         </a>
 
         <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Система</div>
-        <a href="/admin/users.php" class="<?= strpos($_SERVER['PHP_SELF'], 'users') ? 'active' : '' ?>">
-            <i class="bi bi-people-fill me-2"></i> Пользователи
+        <a href="/admin/users.php" class="<?= in_array($curAdminPage, ['users.php', 'user_edit.php'], true) ? 'active' : '' ?>">
+            <i class="bi bi-people-fill me-2" aria-hidden="true"></i> Пользователи
         </a>
         <a href="/" class="mt-auto bg-dark text-white border-top border-secondary">
-            <i class="bi bi-box-arrow-left me-2"></i> На сайт
+            <i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i> На сайт
         </a>
     </div>
 
-    <!-- CONTENT WRAPPER -->
     <div class="flex-grow-1 p-4 content-wrapper" style="max-height: 100vh; overflow-y: auto; width: 100%;">
+    <?php if (!empty($_SESSION['flash'])): ?>
+        <div class="alert alert-<?= e($_SESSION['flash_type'] ?? 'info') ?> border-2 border-dark rounded-0 fw-bold alert-dismissible fade show" role="alert">
+            <?= e($_SESSION['flash']) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+        </div>
+        <?php unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+    <?php endif; ?>
 
     <script>
         function toggleSidebar() {

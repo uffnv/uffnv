@@ -1,57 +1,68 @@
 <?php
 // pages/topics_list.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/header.php';
 
-// --- 1. ПАРАМЕТРЫ ФИЛЬТРАЦИИ ДЛЯ ПЕРВОЙ ЗАГРУЗКИ ---
+// --- 1. ПАРАМЕТРЫ ФИЛЬТРАЦИИ И ПАГИНАЦИИ ---
 $whereClause = "WHERE t.is_approved = 1";
 $params = [];
 
-// Фильтр по категории (ID)
 $catFilterId = isset($_GET['cat']) ? (int)$_GET['cat'] : 0;
 $currentCatTitle = '';
 
 if ($catFilterId > 0) {
     $whereClause .= " AND t.category_id = ?";
     $params[] = $catFilterId;
-    
-    // Получаем название выбранной категории для заголовка
+
     $stmtCat = $pdo->prepare("SELECT title FROM categories WHERE id = ?");
     $stmtCat->execute([$catFilterId]);
-    $currentCatTitle = $stmtCat->fetchColumn();
+    $currentCatTitle = (string)$stmtCat->fetchColumn();
 }
 
-// Поиск (Search) - обрабатывается и при GET-запросе для сохранения состояния
-$search = trim($_GET['q'] ?? '');
-if (!empty($search)) {
+$search = trim((string)($_GET['q'] ?? ''));
+if ($search !== '') {
     $whereClause .= " AND t.title LIKE ?";
     $params[] = "%$search%";
 }
 
+$perPage = 24;
+$page = max(1, (int)($_GET['page'] ?? 1));
+
+$stmtCount = $pdo->prepare("SELECT COUNT(*) FROM topics t $whereClause");
+$stmtCount->execute($params);
+$totalTopics = (int)$stmtCount->fetchColumn();
+$totalPages = max(1, (int)ceil($totalTopics / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+
 // --- 2. ПОЛУЧЕНИЕ ТЕМ ---
 $sqlAll = "
-    SELECT t.*, u.username, u.avatar, c.title as cat_title,
-    (SELECT COUNT(*) FROM posts WHERE topic_id = t.id) as replies_count
+    SELECT t.*, COALESCE(u.username, 'deleted') AS username, u.avatar,
+           COALESCE(c.title, 'Без раздела') AS cat_title,
+           (SELECT COUNT(*) FROM posts WHERE topic_id = t.id) AS replies_count
     FROM topics t
-    JOIN users u ON t.user_id = u.id
-    JOIN categories c ON t.category_id = c.id
+    LEFT JOIN users u ON t.user_id = u.id
+    LEFT JOIN categories c ON t.category_id = c.id
     $whereClause
     ORDER BY t.created_at DESC
-    LIMIT 60
+    LIMIT $perPage OFFSET $offset
 ";
 $stmt = $pdo->prepare($sqlAll);
 $stmt->execute($params);
 $allTopics = $stmt->fetchAll();
 
 // --- 3. ПОЛУЧЕНИЕ ВСЕХ КАТЕГОРИЙ (ДЛЯ МОДАЛКИ) ---
-$allCats = $pdo->query("SELECT * FROM categories WHERE is_approved = 1 ORDER BY title ASC")->fetchAll();
+$allCats = $pdo->query("SELECT id, title FROM categories WHERE is_approved = 1 ORDER BY title ASC")->fetchAll();
 
 // --- 4. ПОСЛЕДНИЕ ТЕМЫ (Сайдбар) ---
 $sqlRecent = "
-    SELECT t.id, t.title, t.created_at, u.username 
+    SELECT t.id, t.title, t.created_at, COALESCE(u.username, 'deleted') AS username
     FROM topics t
-    JOIN users u ON t.user_id = u.id
+    LEFT JOIN users u ON t.user_id = u.id
     WHERE t.is_approved = 1
     ORDER BY t.created_at DESC
     LIMIT 7
@@ -59,34 +70,19 @@ $sqlRecent = "
 $recentTopics = $pdo->query($sqlRecent)->fetchAll();
 
 function time_ago($datetime) {
-    $diff = time() - strtotime($datetime);
+    $ts = strtotime((string)$datetime);
+    if (!$ts) return '';
+    $diff = time() - $ts;
     if ($diff < 60) return 'только что';
     if ($diff < 3600) return floor($diff / 60) . ' мин. назад';
     if ($diff < 86400) return floor($diff / 3600) . ' ч. назад';
-    return date('d.m.Y', strtotime($datetime));
+    return date('d.m.Y', $ts);
 }
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* Фон */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px; perspective: 500px; transform-style: preserve-3d; animation: grid-move 6s linear infinite; box-shadow: inset 0 0 150px rgba(0,0,0,0.9); z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 40px 40px; }
 
     /* Анимация появления карточек */
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -152,15 +148,15 @@ function time_ago($datetime) {
                 <i class="bi bi-arrow-left"></i> На главную
             </a>
             <h1 class="display-3 street-font m-0 text-white" style="letter-spacing: 2px;">
-                <?php if($currentCatTitle): ?>
-                    РАЗДЕЛ: <span class="text-street-yellow"><?= htmlspecialchars($currentCatTitle) ?></span>
+                <?php if ($currentCatTitle !== ''): ?>
+                    РАЗДЕЛ: <span class="text-street-yellow"><?= e($currentCatTitle) ?></span>
                 <?php else: ?>
                     АРХИВ <span class="text-street-yellow">ТЕМ</span>
                 <?php endif; ?>
             </h1>
         </div>
-        
-        <?php if($catFilterId > 0): ?>
+
+        <?php if ($catFilterId > 0): ?>
             <a href="topics_list.php" class="btn btn-outline-light rounded-0 border-2 street-font mt-3 mt-md-0">
                 <i class="bi bi-x-lg"></i> Сбросить фильтр
             </a>
@@ -168,41 +164,42 @@ function time_ago($datetime) {
     </div>
 
     <div class="row g-5">
-        
+
         <!-- ЛЕВАЯ КОЛОНКА (2/3) -->
         <div class="col-lg-8">
-            
+
             <!-- Панель поиска и фильтра -->
-            <div class="mb-5 sticky-top pt-2" style="top: 0; z-index: 10;">
-                <div class="d-flex shadow-lg">
-                    <!-- Кнопка фильтра (Модалка) -->
-                    <button type="button" class="btn btn-filter rounded-0 px-4 py-3 d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#categoriesModal">
-                        <i class="bi bi-funnel-fill fs-5 me-2"></i> 
+            <div class="mb-5 sticky-top pt-2" style="top: 85px; z-index: 90;">
+                <form method="GET" action="topics_list.php" id="searchForm" class="d-flex shadow-lg">
+                    <?php if ($catFilterId > 0): ?>
+                        <input type="hidden" name="cat" value="<?= (int)$catFilterId ?>">
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-filter rounded-0 px-4 py-3 d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#categoriesModal" aria-label="Выбрать раздел">
+                        <i class="bi bi-funnel-fill fs-5 me-2"></i>
                         <span class="d-none d-sm-inline">Фильтр</span>
                     </button>
 
-                    <!-- ИНПУТ ПОИСКА -->
                     <div class="flex-grow-1 position-relative">
-                        <input type="text" id="searchInput" 
-                               class="form-control form-control-lg rounded-0 border-3 border-dark fw-bold px-4 street-font h-100" 
-                               placeholder="Найти тему..." 
-                               value="<?= htmlspecialchars($search) ?>"
+                        <input type="text" name="q" id="searchInput"
+                               class="form-control form-control-lg rounded-0 border-3 border-dark fw-bold px-4 street-font h-100"
+                               placeholder="Найти тему..."
+                               aria-label="Поиск тем"
+                               value="<?= e($search) ?>"
                                autocomplete="off"
                                style="border-right: 0; border-left: 0;">
-                        
-                        <!-- Индикатор загрузки -->
-                        <div id="searchSpinner" class="spinner-border text-dark position-absolute top-50 end-0 translate-middle-y me-3" style="display:none; width: 1.5rem; height: 1.5rem;" role="status"></div>
+
+                        <div id="searchSpinner" class="spinner-border text-dark position-absolute top-50 end-0 translate-middle-y me-3" style="display:none; width: 1.5rem; height: 1.5rem;" role="status" aria-label="Загрузка"></div>
                     </div>
-                        
-                    <button type="button" class="btn btn-search rounded-0 fw-black px-4 border-start-0">
+
+                    <button type="submit" class="btn btn-search rounded-0 fw-black px-4 border-start-0" aria-label="Искать">
                         <i class="bi bi-search fs-4"></i>
                     </button>
-                </div>
+                </form>
             </div>
 
             <!-- КОНТЕЙНЕР ТЕМ (Обновляется через AJAX) -->
             <div id="topicsContainer" class="row g-4">
-                <?php if(empty($allTopics)): ?>
+                <?php if (empty($allTopics)): ?>
                     <div class="alert alert-light border-3 border-dark rounded-0 text-center py-5 shadow-sm col-12">
                         <i class="bi bi-search fs-1 mb-3 d-block"></i>
                         <h4 class="street-font">Темы не найдены</h4>
@@ -210,39 +207,43 @@ function time_ago($datetime) {
                         <a href="topics_list.php" class="btn btn-black rounded-0 text-uppercase fw-bold mt-2">Смотреть всё</a>
                     </div>
                 <?php else: ?>
-                    <?php foreach($allTopics as $t): ?>
+                    <?php foreach ($allTopics as $t): ?>
+                        <?php $tAvatar = getAvatarUrl($t['avatar'] ?? null); ?>
                         <div class="col-md-6 col-xl-4 d-flex align-items-stretch topic-item-anim">
                             <div class="card w-100 rounded-0 topic-card position-relative">
                                 <div class="card-body d-flex flex-column p-4">
-                                    
-                                    <!-- Верх: Категория и дата -->
+
                                     <div class="d-flex justify-content-between align-items-start mb-3">
                                         <span class="badge bg-black text-white rounded-0 border border-dark text-uppercase street-font" style="font-size: 0.6rem; letter-spacing: 0.5px;">
-                                            <?= htmlspecialchars($t['cat_title']) ?>
+                                            <?= e($t['cat_title']) ?>
                                         </span>
                                         <small class="text-muted fw-bold font-monospace" style="font-size: 0.7rem;">
-                                            <?= date('d.m', strtotime($t['created_at'])) ?>
+                                            <?= e(date('d.m', strtotime((string)$t['created_at']))) ?>
                                         </small>
                                     </div>
 
-                                    <!-- Заголовок -->
                                     <h6 class="street-font lh-sm mb-3">
-                                        <a href="/pages/topic.php?id=<?= $t['id'] ?>" class="text-dark text-decoration-none stretched-link">
-                                            <?= mb_strimwidth(htmlspecialchars($t['title']), 0, 50, '...') ?>
+                                        <a href="/pages/topic.php?id=<?= (int)$t['id'] ?>" class="text-dark text-decoration-none stretched-link">
+                                            <?= e(mb_strimwidth((string)$t['title'], 0, 50, '...')) ?>
                                         </a>
                                     </h6>
 
-                                    <!-- Низ: Автор и ответы -->
                                     <div class="mt-auto d-flex align-items-center justify-content-between pt-3 border-top border-2 border-light">
                                         <div class="d-flex align-items-center">
-                                            <img src="<?= $t['avatar'] ? '/'.$t['avatar'] : 'https://via.placeholder.com/30' ?>" 
-                                                 class="rounded-circle border border-dark me-2" width="24" height="24" style="object-fit:cover;">
+                                            <?php if ($tAvatar): ?>
+                                                <img src="<?= e($tAvatar) ?>" alt="<?= e($t['username']) ?>"
+                                                     class="rounded-circle border border-dark me-2" width="24" height="24" style="object-fit:cover;">
+                                            <?php else: ?>
+                                                <div class="avatar-fallback-badge me-2" style="width:24px;height:24px;font-size:0.7rem;">
+                                                    <?= e(safeFirstChar($t['username'])) ?>
+                                                </div>
+                                            <?php endif; ?>
                                             <span class="small fw-bold text-muted text-truncate street-font" style="max-width: 80px;">
-                                                @<?= htmlspecialchars($t['username']) ?>
+                                                @<?= e($t['username']) ?>
                                             </span>
                                         </div>
                                         <div class="fw-bold small text-dark">
-                                            <i class="bi bi-chat-fill text-warning me-1" style="text-shadow: 1px 1px 0 #000;"></i> <?= $t['replies_count'] ?>
+                                            <i class="bi bi-chat-fill text-warning me-1" style="text-shadow: 1px 1px 0 #000;"></i> <?= (int)$t['replies_count'] ?>
                                         </div>
                                     </div>
 
@@ -252,6 +253,31 @@ function time_ago($datetime) {
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+
+            <?php if ($totalPages > 1): ?>
+                <nav id="topicsPagination" class="mt-5 d-flex justify-content-between align-items-center bg-black border border-2 border-white p-3" aria-label="Пагинация тем">
+                    <?php
+                        $baseQuery = [];
+                        if ($catFilterId > 0) $baseQuery['cat'] = $catFilterId;
+                        if ($search !== '') $baseQuery['q'] = $search;
+                    ?>
+                    <?php if ($page > 1): ?>
+                        <a href="topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page - 1])) ?>" class="btn btn-outline-light rounded-0 street-font btn-sm">
+                            <i class="bi bi-arrow-left"></i> Назад
+                        </a>
+                    <?php else: ?>
+                        <span></span>
+                    <?php endif; ?>
+                    <span class="street-font text-street-yellow small">Стр. <?= $page ?> из <?= $totalPages ?></span>
+                    <?php if ($page < $totalPages): ?>
+                        <a href="topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page + 1])) ?>" class="btn btn-warning text-dark rounded-0 street-font btn-sm fw-bold">
+                            Далее <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php else: ?>
+                        <span></span>
+                    <?php endif; ?>
+                </nav>
+            <?php endif; ?>
 
         </div>
 
@@ -264,16 +290,16 @@ function time_ago($datetime) {
                     </h5>
                 </div>
                 <div class="list-group list-group-flush rounded-0">
-                    <?php foreach($recentTopics as $rt): ?>
-                        <a href="/pages/topic.php?id=<?= $rt['id'] ?>" class="list-group-item list-group-item-action p-3 border-bottom border-dark bg-transparent">
+                    <?php foreach ($recentTopics as $rt): ?>
+                        <a href="/pages/topic.php?id=<?= (int)$rt['id'] ?>" class="list-group-item list-group-item-action p-3 border-bottom border-dark bg-transparent">
                             <div class="d-flex w-100 justify-content-between mb-1">
-                                <small class="fw-bold text-muted street-font">@<?= htmlspecialchars($rt['username']) ?></small>
+                                <small class="fw-bold text-muted street-font">@<?= e($rt['username']) ?></small>
                                 <small class="text-danger fw-bold" style="font-size: 0.7rem;">
-                                    <?= time_ago($rt['created_at']) ?>
+                                    <?= e(time_ago($rt['created_at'])) ?>
                                 </small>
                             </div>
                             <div class="street-font text-dark lh-sm" style="font-size: 0.9rem;">
-                                <?= mb_strimwidth(htmlspecialchars($rt['title']), 0, 45, '...') ?>
+                                <?= e(mb_strimwidth((string)$rt['title'], 0, 45, '...')) ?>
                             </div>
                         </a>
                     <?php endforeach; ?>
@@ -298,16 +324,16 @@ function time_ago($datetime) {
         <div class="modal-content rounded-0">
             <div class="modal-header bg-black text-white rounded-0 py-3 border-bottom border-3 border-dark">
                 <h5 class="modal-title street-font">ВЫБЕРИ РАЗДЕЛ</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body p-0 bg-white">
                 <div class="list-group list-group-flush">
                     <a href="topics_list.php" class="list-group-item list-group-item-action p-3 cat-modal-item bg-light text-center border-bottom-2 border-dark">
                         <i class="bi bi-grid-fill me-2"></i> ВСЕ ТЕМЫ
                     </a>
-                    <?php foreach($allCats as $c): ?>
-                        <a href="topics_list.php?cat=<?= $c['id'] ?>" class="list-group-item list-group-item-action p-3 cat-modal-item d-flex justify-content-between align-items-center">
-                            <span><?= htmlspecialchars($c['title']) ?></span>
+                    <?php foreach ($allCats as $c): ?>
+                        <a href="topics_list.php?cat=<?= (int)$c['id'] ?>" class="list-group-item list-group-item-action p-3 cat-modal-item d-flex justify-content-between align-items-center">
+                            <span><?= e($c['title']) ?></span>
                             <i class="bi bi-chevron-right opacity-50"></i>
                         </a>
                     <?php endforeach; ?>
@@ -320,18 +346,19 @@ function time_ago($datetime) {
 <!-- JAVASCRIPT ДЛЯ LIVE SEARCH -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('searchForm');
     const searchInput = document.getElementById('searchInput');
     const topicsContainer = document.getElementById('topicsContainer');
+    const pagination = document.getElementById('topicsPagination');
     const spinner = document.getElementById('searchSpinner');
-    const currentCatId = <?= $catFilterId ?>; // Передаем PHP переменную в JS
-    
+    const currentCatId = <?= (int)$catFilterId ?>;
+
     let debounceTimer;
 
-    // Функция поиска
     function performSearch(query) {
         spinner.style.display = 'block';
-        
-        // Формируем URL. Файл search_topics.php должен лежать в той же папке /pages/
+        if (pagination) pagination.style.display = query ? 'none' : 'flex';
+
         let url = `search_topics.php?q=${encodeURIComponent(query)}`;
         if (currentCatId > 0) {
             url += `&cat=${currentCatId}`;
@@ -340,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Сеть ответила с ошибкой: ' + response.status);
+                    throw new Error('HTTP ' + response.status);
                 }
                 return response.text();
             })
@@ -348,22 +375,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 topicsContainer.innerHTML = html;
                 spinner.style.display = 'none';
             })
-            .catch(err => {
-                console.error('Ошибка поиска:', err);
+            .catch(() => {
                 spinner.style.display = 'none';
             });
     }
 
-    // Слушатель ввода с задержкой (Debounce)
-    if (searchInput) {
+    if (searchForm && searchInput) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+            performSearch(searchInput.value.trim());
+        });
+
         searchInput.addEventListener('input', function() {
             clearTimeout(debounceTimer);
             const query = this.value.trim();
-
-            // Ждем 300мс после окончания ввода перед отправкой запроса
-            debounceTimer = setTimeout(() => {
-                performSearch(query);
-            }, 300);
+            debounceTimer = setTimeout(() => performSearch(query), 300);
         });
     }
 });

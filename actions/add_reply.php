@@ -1,84 +1,77 @@
 <?php
 // actions/add_reply.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
-    header("Location: /pages/forum.php");
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['user_id'])) {
+    header("Location: /pages/topics_list.php");
     exit;
 }
 
-$userId = $_SESSION['user_id'];
-$topicId = (int)$_POST['topic_id'];
-$content = trim($_POST['content']);
+$userId  = (int)$_SESSION['user_id'];
+$topicId = (int)($_POST['topic_id'] ?? 0);
+$content = trim($_POST['content'] ?? '');
+$backUrl = $topicId > 0 ? '/pages/topic.php?id=' . $topicId : '/pages/topics_list.php';
 
-// Валидация
-if (empty($content) || $topicId <= 0) {
-    header("Location: /pages/topic.php?id=$topicId");
-    exit;
+requireCsrfOrRedirect($backUrl);
+
+if ($content === '' || $topicId <= 0) {
+    redirectWithFlash($backUrl, 'Введите текст сообщения.', 'warning');
 }
 
-// Проверка бана
-$role = strtolower(trim($_SESSION['role'] ?? 'user'));
-if ($role === 'banned') {
-    die("Вы забанены.");
+// Проверка бана: учитывается и общий бан форума, и локальный бан в конкретной теме (topic_id)
+$ban = getActiveForumBan($pdo, $userId, $topicId);
+if ($ban) {
+    $scope = !empty($ban['topic_id']) ? 'в этой теме' : 'на форуме';
+    $until = !empty($ban['expires_at']) ? ' до ' . date('d.m.Y H:i', strtotime($ban['expires_at'])) : ' бессрочно';
+    $reason = !empty($ban['reason']) ? ' (' . $ban['reason'] . ')' : '';
+    redirectWithFlash($backUrl, 'Вам ограничен доступ к ответам ' . $scope . $until . $reason . '.', 'danger');
 }
 
 try {
-    // 1. Сохраняем пост
-    $stmt = $pdo->prepare("INSERT INTO posts (content, user_id, topic_id, created_at) VALUES (?, ?, ?, NOW())");
-    $stmt->execute([$content, $userId, $topicId]);
-    $postId = $pdo->lastInsertId(); // ID нового поста (для ссылки-якоря)
-
-    // --- УВЕДОМЛЕНИЯ ---
-    
-    // А. Уведомление автору темы (если это не он сам отвечает)
-    $stmt = $pdo->prepare("SELECT user_id, title FROM topics WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, user_id, title, is_approved FROM topics WHERE id = ? LIMIT 1");
     $stmt->execute([$topicId]);
     $topic = $stmt->fetch();
 
-    if ($topic && $topic['user_id'] != $userId) {
-        $msg = "Новый ответ в вашей теме: " . mb_substr($topic['title'], 0, 20) . "...";
-        $link = "/pages/topic.php?id=$topicId#post-$postId";
-        
+    if (!$topic || (!$topic['is_approved'] && !isAdmin())) {
+        redirectWithFlash('/pages/topics_list.php', 'Тема не найдена или ещё не одобрена.', 'danger');
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO posts (content, user_id, topic_id, created_at) VALUES (?, ?, ?, NOW())");
+    $stmt->execute([$content, $userId, $topicId]);
+    $postId = (int)$pdo->lastInsertId();
+
+    $topicShort = mb_substr($topic['title'], 0, 20, 'UTF-8');
+    $link = "/pages/topic.php?id=$topicId#post-$postId";
+
+    // Уведомление автору темы
+    if ((int)$topic['user_id'] !== $userId) {
+        $msg = "Новый ответ в вашей теме: " . $topicShort . "...";
         $pdo->prepare("INSERT INTO notifications (user_id, type, message, link) VALUES (?, 'reply', ?, ?)")
             ->execute([$topic['user_id'], $msg, $link]);
     }
 
-    // Б. Уведомление упомянутым пользователям (@username)
-    // Ищем все вхождения @word
-    preg_match_all('/@(\w+)/u', $content, $matches);
-    
+    // Уведомление упомянутым пользователям (@username)
+    preg_match_all('/@([a-zA-Zа-яА-ЯёЁ0-9_.-]+)/u', $content, $matches);
     if (!empty($matches[1])) {
-        // Убираем дубликаты (если упомянул одного дважды)
         $mentionedNames = array_unique($matches[1]);
-        
+        $uStmt = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+        $nStmt = $pdo->prepare("INSERT INTO notifications (user_id, type, message, link) VALUES (?, 'mention', ?, ?)");
+
         foreach ($mentionedNames as $name) {
-            // Ищем юзера по нику
-            $uStmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
             $uStmt->execute([$name]);
             $targetUser = $uStmt->fetch();
-
-            // Если юзер существует и это не мы сами (самому себе слать странно)
-            if ($targetUser && $targetUser['id'] != $userId) {
-                // Чтобы не спамить автору темы дважды (если мы ответили ему и упомянули его), можно проверить
-                if ($topic && $targetUser['id'] == $topic['user_id']) {
-                    continue; // Он уже получил уведомление выше (пункт А)
-                }
-
-                $msg = "Вас упомянули в теме: " . mb_substr($topic['title'], 0, 20) . "...";
-                $link = "/pages/topic.php?id=$topicId#post-$postId";
-                
-                $pdo->prepare("INSERT INTO notifications (user_id, type, message, link) VALUES (?, 'mention', ?, ?)")
-                    ->execute([$targetUser['id'], $msg, $link]);
+            if ($targetUser && (int)$targetUser['id'] !== $userId && (int)$targetUser['id'] !== (int)$topic['user_id']) {
+                $msg = "Вас упомянули в теме: " . $topicShort . "...";
+                $nStmt->execute([$targetUser['id'], $msg, $link]);
             }
         }
     }
 
-    // Редирект обратно к посту
-    header("Location: /pages/topic.php?id=$topicId#post-$postId");
+    header("Location: " . $link);
     exit;
-
-} catch (Exception $e) {
-    die("Ошибка: " . $e->getMessage());
+} catch (\Throwable $e) {
+    error_log("Add reply error: " . $e->getMessage());
+    redirectWithFlash($backUrl, 'Ошибка сохранения ответа. Попробуйте позже.', 'danger');
 }

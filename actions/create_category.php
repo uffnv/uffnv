@@ -1,45 +1,48 @@
 <?php
 // actions/create_category.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
-    header("Location: /pages/signin.php");
+checkAuth('/pages/login.php');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: /pages/topics_list.php");
     exit;
 }
 
-$title = trim($_POST['title']);
-$desc = trim($_POST['description']);
-$userId = $_SESSION['user_id'];
+requireCsrfOrRedirect('/pages/topics_list.php');
 
-if (empty($title)) {
-    die("Ошибка: Название раздела обязательно.");
+$userId = (int)$_SESSION['user_id'];
+$ban = getActiveForumBan($pdo, $userId, null);
+if ($ban) {
+    redirectWithFlash('/pages/topics_list.php', 'У вас ограничен доступ к созданию категорий на форуме.', 'danger');
+}
+
+$title = trim($_POST['title'] ?? '');
+$desc  = trim($_POST['description'] ?? '');
+
+if ($title === '') {
+    redirectWithFlash('/pages/topics_list.php', 'Название раздела обязательно.', 'danger');
 }
 
 try {
-    // 1. Проверяем роль текущего пользователя
-    $stmtUser = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $stmtUser = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
     $stmtUser->execute([$userId]);
     $user = $stmtUser->fetch();
 
-    // Если Админ/Супер-Админ -> Одобряем сразу (1), иначе -> На модерацию (0)
-    $isApproved = ($user['role'] === 'admin' || $user['role'] === 'super_admin') ? 1 : 0;
+    $isApproved = ($user && in_array($user['role'], ['admin', 'super_admin'], true)) ? 1 : 0;
 
-    // 2. Вставляем категорию
     $sql = "INSERT INTO categories (title, description, is_approved, user_id) VALUES (?, ?, ?, ?)";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$title, $desc, $isApproved, $userId]);
 
-    // 3. Редирект
     if ($isApproved) {
-        // Если админ создал - сразу на форум, смотреть результат
-        header("Location: /pages/forum.php");
-    } else {
-        // Если юзер - в профиль с уведомлением
-        header("Location: /pages/profile.php?msg=category_pending");
+        redirectWithFlash('/pages/topics_list.php', 'Категория создана!', 'success');
     }
+    header("Location: /pages/profile.php?msg=category_pending");
     exit;
-
-} catch (PDOException $e) {
-    die("Ошибка БД: " . $e->getMessage());
+} catch (\PDOException $e) {
+    error_log("Create category error: " . $e->getMessage());
+    redirectWithFlash('/pages/topics_list.php', 'Ошибка создания категории.', 'danger');
 }

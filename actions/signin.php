@@ -1,6 +1,7 @@
 <?php
 // actions/signin.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -8,11 +9,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+requireCsrfOrRedirect('/pages/login.php');
+
 $email = trim($_POST['email'] ?? '');
 $password = $_POST['password'] ?? '';
 
-// Валидация на пустоту
-if (empty($email) || empty($password)) {
+if ($email === '' || $password === '') {
     $_SESSION['error'] = "Введите email и пароль";
     $_SESSION['old'] = ['email' => $email];
     header("Location: /pages/login.php");
@@ -20,38 +22,36 @@ if (empty($email) || empty($password)) {
 }
 
 try {
-    // Поиск пользователя и получение флага data_consent
-    $stmt = $pdo->prepare("SELECT id, `role`, password_hash, data_consent FROM users WHERE email = ?");
+    $stmt = $pdo->prepare("SELECT id, username, `role`, password_hash, data_consent FROM users WHERE email = ? LIMIT 1");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Проверка пароля
     if ($user && password_verify($password, $user['password_hash'])) {
-        
         unset($_SESSION['error'], $_SESSION['old']);
+        regenerateAppSession();
 
-        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_id'] = (int)$user['id'];
+        $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
-        $_SESSION['data_consent'] = $user['data_consent']; // Передаем флаг в сессию
+        $_SESSION['data_consent'] = (int)$user['data_consent'];
 
-        $checkRole = strtolower(trim($user['role']));
+        // Если старый глобальный бан на форуме истёк — getActiveForumBan автоматически обновит роль
+        getActiveForumBan($pdo, (int)$user['id']);
 
-        // Редирект в зависимости от роли
-        if ($checkRole === 'admin' || $checkRole === 'super_admin') {
+        if (isAdmin()) {
             header("Location: /admin/index.php");
         } else {
             header("Location: /pages/profile.php");
         }
         exit;
-
-    } else {
-        $_SESSION['error'] = "Неверный email или пароль";
-        $_SESSION['old'] = ['email' => $email];
-        header("Location: /pages/login.php");
-        exit;
     }
 
-} catch (PDOException $e) {
+    $_SESSION['error'] = "Неверный email или пароль";
+    $_SESSION['old'] = ['email' => $email];
+    header("Location: /pages/login.php");
+    exit;
+} catch (\PDOException $e) {
+    error_log("Signin error: " . $e->getMessage());
     $_SESSION['error'] = "Ошибка сервера. Попробуйте позже.";
     header("Location: /pages/login.php");
     exit;

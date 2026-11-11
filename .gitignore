@@ -1,5 +1,6 @@
 # Local configuration (secrets, DB credentials)
 config/db.local.php
+config/secrets.local.php
 .env
 .env.*
 .envrc

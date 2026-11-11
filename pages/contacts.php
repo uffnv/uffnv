@@ -1,40 +1,13 @@
 <?php
 // pages/contacts.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
     /* === ШРИФТЫ И ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === КАРТОЧКИ КОНТАКТОВ === */
     .contact-card {
@@ -161,13 +134,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <i class="bi bi-telephone-fill display-3"></i>
                 </div>
                 <h4 class="street-font mb-3 border-bottom border-3 border-dark pb-2 w-100">Связь</h4>
-                <p class="fs-4 street-font mb-1 text-nowrap">+7 (999) 000-00-00</p>
-                <p class="text-muted fw-bold mb-3">support@uffnv.ru</p>
-                
+                <p class="fs-4 street-font mb-1 text-nowrap">
+                    <a href="tel:+79990000000" class="text-dark text-decoration-none">+7 (999) 000-00-00</a>
+                </p>
+                <p class="text-muted fw-bold mb-3">
+                    <a href="mailto:support@uffnv.ru" class="text-muted text-decoration-none">support@uffnv.ru</a>
+                </p>
+
                 <div class="d-flex gap-2 mt-auto w-100">
-                    <a href="#" class="social-btn p-2 rounded-0 text-decoration-none fw-bold flex-grow-1">TG</a>
-                    <a href="#" class="social-btn p-2 rounded-0 text-decoration-none fw-bold flex-grow-1">VK</a>
-                    <a href="#" class="social-btn p-2 rounded-0 text-decoration-none fw-bold flex-grow-1">WA</a>
+                    <a href="mailto:support@uffnv.ru" class="social-btn p-2 rounded-0 text-decoration-none fw-bold flex-grow-1">EMAIL</a>
+                    <a href="/pages/topics_list.php" class="social-btn p-2 rounded-0 text-decoration-none fw-bold flex-grow-1">ФОРУМ</a>
                 </div>
             </div>
         </div>
@@ -197,9 +173,9 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <!-- КАРТА И ФОРМА -->
+    <!-- КАРТА И ПРЯМАЯ СВЯЗЬ -->
     <div class="row g-0 border-3 border-white shadow-lg" style="box-shadow: 10px 10px 0 #000;">
-        
+
         <!-- КАРТА -->
         <div class="col-lg-6">
             <div class="map-container d-flex align-items-center justify-content-center">
@@ -211,28 +187,21 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- ФОРМА -->
+        <!-- ПРЯМЫЕ КАНАЛЫ СВЯЗИ -->
         <div class="col-lg-6">
-            <div class="bg-white p-5 h-100 d-flex flex-column justify-content-center border-3 border-dark border-start-0 mobile-border-fix">
-                <h3 class="street-font mb-4 text-dark text-uppercase border-bottom border-4 border-dark pb-2 d-inline-block">Написать в штаб</h3>
-                
-                <form>
-                    <div class="mb-3">
-                        <label class="fw-black small text-uppercase mb-1 street-font text-dark">Твое имя</label>
-                        <input type="text" class="form-control form-control-lg" placeholder="Как обращаться?">
-                    </div>
-                    <div class="mb-3">
-                        <label class="fw-black small text-uppercase mb-1 street-font text-dark">Email / Telegram</label>
-                        <input type="text" class="form-control form-control-lg" placeholder="Куда отвечать?">
-                    </div>
-                    <div class="mb-4">
-                        <label class="fw-black small text-uppercase mb-1 street-font text-dark">Сообщение</label>
-                        <textarea class="form-control" rows="3" placeholder="Твой вопрос..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-send w-100 py-3 text-uppercase fs-5 shadow-sm">
-                        ОТПРАВИТЬ <i class="bi bi-send-fill ms-2"></i>
-                    </button>
-                </form>
+            <div class="bg-white p-5 h-100 d-flex flex-column justify-content-center border-3 border-dark border-lg-start-0">
+                <h3 class="street-font mb-3 text-dark text-uppercase border-bottom border-4 border-dark pb-2 d-inline-block">Связаться со штабом</h3>
+                <p class="fw-bold text-dark mb-4">
+                    По вопросам заказов, возвратов и сотрудничества пишите на официальную почту или создайте тему в комьюнити.
+                </p>
+                <div class="d-grid gap-3">
+                    <a href="mailto:support@uffnv.ru?subject=%D0%92%D0%BE%D0%BF%D1%80%D0%BE%D1%81%20%D0%B2%20UFFNV%20STORE" class="btn btn-send w-100 py-3 text-uppercase fs-5 shadow-sm">
+                        <i class="bi bi-envelope-fill me-2"></i> Написать на support@uffnv.ru
+                    </a>
+                    <a href="/pages/topics_list.php" class="btn btn-outline-dark rounded-0 border-3 border-dark w-100 py-3 text-uppercase fs-6 street-font">
+                        <i class="bi bi-chat-dots-fill me-2"></i> Задать вопрос на форуме
+                    </a>
+                </div>
             </div>
         </div>
 

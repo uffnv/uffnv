@@ -1,141 +1,189 @@
 <?php
 // pages/profile.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/header.php';
 
-// --- 1. ПРОВЕРКА ДОСТУПА ---
-if (!isset($_SESSION['user_id'])) {
-    echo "<script>window.location.href='/pages/login.php';</script>";
-    exit;
-}
+checkAuth('/pages/login.php');
 
 // --- 2. ПОЛУЧАЕМ ДАННЫЕ ЮЗЕРА ---
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch();
+$stmt->execute([(int)$_SESSION['user_id']]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
+    $_SESSION = [];
     session_destroy();
-    echo "<script>window.location.href='/';</script>";
+    header("Location: /pages/login.php");
     exit;
 }
+
+// Синхронизируем роль в сессии с актуальной из БД
+$_SESSION['role'] = $user['role'];
 
 // --- 3. ЛОГИКА МОДЕРАТОРА ---
 $pendingTopics = [];
 $pendingCategories = [];
-$modMessage = "";
-$modError = "";
-$isModerator = ($user['role'] === 'admin' || $user['role'] === 'super_admin');
+$modMessage = '';
+$modError = '';
+$isModerator = in_array($user['role'], ['admin', 'super_admin'], true);
+$supportsTopicBan = hasUserBansTopicColumn($pdo);
 
 if ($isModerator) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireCsrfOrRedirect('/pages/profile.php');
+
         if (isset($_POST['approve_cat_id'])) {
-            $pdo->prepare("UPDATE shop_categories SET is_approved = 1 WHERE id = ?")->execute([(int)$_POST['approve_cat_id']]); 
-            $modMessage = "Категория одобрена!";
+            $pdo->prepare("UPDATE categories SET is_approved = 1 WHERE id = ?")->execute([(int)$_POST['approve_cat_id']]);
+            $modMessage = 'Раздел форума одобрен!';
         }
         if (isset($_POST['delete_cat_id'])) {
-            $pdo->prepare("DELETE FROM shop_categories WHERE id = ?")->execute([(int)$_POST['delete_cat_id']]);
-            $modMessage = "Категория удалена.";
+            $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([(int)$_POST['delete_cat_id']]);
+            $modMessage = 'Заявка на раздел удалена.';
         }
         if (isset($_POST['approve_topic_id'])) {
             $pdo->prepare("UPDATE topics SET is_approved = 1 WHERE id = ?")->execute([(int)$_POST['approve_topic_id']]);
-            $modMessage = "Тема опубликована!";
+            $modMessage = 'Тема опубликована!';
         }
-        
-        // Банхаммер
+
+        // Банхаммер (ТОЛЬКО форум: общий или в конкретной теме; заказы в магазине не блокируются)
         if (isset($_POST['ban_user_input'])) {
-            $input = trim($_POST['ban_user_input']);
-            $reason = trim($_POST['ban_reason'] ?? 'Нарушение правил');
-            $banAmount = (int)$_POST['ban_amount']; 
-            $banUnit = $_POST['ban_unit']; 
+            $input = trim((string)$_POST['ban_user_input']);
+            $reason = trim((string)($_POST['ban_reason'] ?? ''));
+            if ($reason === '') {
+                $reason = 'Нарушение правил форума';
+            }
+            $banAmount = max(1, (int)($_POST['ban_amount'] ?? 1));
+            $banUnit = (string)($_POST['ban_unit'] ?? 'days');
+            $banTopicId = isset($_POST['ban_topic_id']) && $_POST['ban_topic_id'] !== '' ? (int)$_POST['ban_topic_id'] : null;
 
-            if (!empty($input)) {
-                $findStmt = $pdo->prepare("SELECT id, role, username FROM users WHERE (username = ? OR id = ?) LIMIT 1");
-                $findStmt->execute([$input, $input]);
-                $victim = $findStmt->fetch();
+            if ($input !== '') {
+                $findStmt = $pdo->prepare("SELECT id, role, username FROM users WHERE username = ? OR id = ? LIMIT 1");
+                $findStmt->execute([$input, ctype_digit($input) ? (int)$input : -1]);
+                $victim = $findStmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($victim) {
-                    if ($victim['role'] === 'super_admin') { $modError = "Нельзя забанить Супер-Админа!"; } 
-                    elseif ($victim['id'] == $user['id']) { $modError = "Нельзя забанить самого себя!"; } 
-                    else {
-                        $expires_at = null;
-                        if ($banUnit !== 'perm') {
-                            try { $dt = new DateTime(); $dt->modify("+$banAmount $banUnit"); $expires_at = $dt->format('Y-m-d H:i:s'); } 
-                            catch (Exception $e) { $expires_at = date('Y-m-d H:i:s', strtotime('+1 day')); }
+                if (!$victim) {
+                    $modError = 'Пользователь не найден.';
+                } elseif ((int)$victim['id'] === (int)$user['id']) {
+                    $modError = 'Нельзя заблокировать самого себя!';
+                } elseif (!canManageTargetUser($user['role'], $victim['role'])) {
+                    $modError = 'Недостаточно прав для блокировки этого пользователя!';
+                } elseif ($banTopicId !== null && !$supportsTopicBan) {
+                    $modError = 'Баны по отдельной теме станут доступны после SQL-миграции topic_id.';
+                } else {
+                    $expires_at = null;
+                    if ($banUnit !== 'perm') {
+                        $allowedUnits = ['hours', 'days', 'months'];
+                        if (!in_array($banUnit, $allowedUnits, true)) {
+                            $banUnit = 'days';
                         }
-                        $pdo->prepare("UPDATE users SET role = 'banned' WHERE id = ?")->execute([$victim['id']]);
-                        try {
-                            $pdo->prepare("INSERT INTO user_bans (user_id, reason, banned_by_id, banned_at, expires_at) VALUES (?, ?, ?, NOW(), ?)")
-                                ->execute([$victim['id'], $reason, $user['id'], $expires_at]);
-                        } catch (PDOException $e) { }
-                        $modMessage = "Пользователь {$victim['username']} забанен.";
+                        $dt = new DateTime();
+                        $dt->modify("+{$banAmount} {$banUnit}");
+                        $expires_at = $dt->format('Y-m-d H:i:s');
                     }
-                } else { $modError = "Пользователь не найден."; }
+
+                    try {
+                        if ($supportsTopicBan) {
+                            $pdo->prepare("INSERT INTO user_bans (user_id, topic_id, reason, banned_by_id, banned_at, expires_at) VALUES (?, ?, ?, ?, NOW(), ?)")
+                                ->execute([(int)$victim['id'], $banTopicId, $reason, (int)$user['id'], $expires_at]);
+                        } else {
+                            $pdo->prepare("INSERT INTO user_bans (user_id, reason, banned_by_id, banned_at, expires_at) VALUES (?, ?, ?, NOW(), ?)")
+                                ->execute([(int)$victim['id'], $reason, (int)$user['id'], $expires_at]);
+                        }
+                        $scopeText = $banTopicId ? " в теме #{$banTopicId}" : ' на форуме';
+                        $modMessage = "Пользователь {$victim['username']} ограничен{$scopeText}.";
+                    } catch (PDOException $e) {
+                        $modError = 'Ошибка записи ограничения в базу данных.';
+                    }
+                }
             }
         }
+
         // Разбан
         if (isset($_POST['unban_user_input'])) {
-            $input = trim($_POST['unban_user_input']);
-            if (!empty($input)) {
-                $unbanStmt = $pdo->prepare("SELECT id, username FROM users WHERE (username = ? OR id = ?) AND role = 'banned'");
-                $unbanStmt->execute([$input, $input]);
-                $bannedUser = $unbanStmt->fetch();
-                if ($bannedUser) {
-                    $pdo->prepare("UPDATE users SET role = 'user' WHERE id = ?")->execute([$bannedUser['id']]);
-                    $modMessage = "Пользователь {$bannedUser['username']} разбанен.";
-                } else { $modError = "Забаненный пользователь не найден."; }
+            $input = trim((string)$_POST['unban_user_input']);
+            $unbanTopicId = isset($_POST['unban_topic_id']) && $_POST['unban_topic_id'] !== '' ? (int)$_POST['unban_topic_id'] : null;
+
+            if ($input !== '') {
+                $unbanStmt = $pdo->prepare("SELECT id, username, role FROM users WHERE username = ? OR id = ? LIMIT 1");
+                $unbanStmt->execute([$input, ctype_digit($input) ? (int)$input : -1]);
+                $bannedUser = $unbanStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$bannedUser) {
+                    $modError = 'Пользователь не найден.';
+                } elseif (!canManageTargetUser($user['role'], $bannedUser['role'])) {
+                    $modError = 'Недостаточно прав для снятия ограничений с этого пользователя.';
+                } else {
+                    if ($unbanTopicId !== null && $supportsTopicBan) {
+                        $pdo->prepare("DELETE FROM user_bans WHERE user_id = ? AND topic_id = ?")->execute([(int)$bannedUser['id'], $unbanTopicId]);
+                        $modMessage = "Ограничение в теме #{$unbanTopicId} для {$bannedUser['username']} снято.";
+                    } else {
+                        $pdo->prepare("DELETE FROM user_bans WHERE user_id = ?")->execute([(int)$bannedUser['id']]);
+                        if ($bannedUser['role'] === 'banned') {
+                            $pdo->prepare("UPDATE users SET role = 'user' WHERE id = ?")->execute([(int)$bannedUser['id']]);
+                        }
+                        $modMessage = "Все форумные ограничения с {$bannedUser['username']} сняты.";
+                    }
+                }
             }
         }
     }
-    try { $pendingTopics = $pdo->query("SELECT t.*, u.username, c.title as cat_title FROM topics t JOIN users u ON t.user_id = u.id JOIN categories c ON t.category_id = c.id WHERE t.is_approved = 0 ORDER BY t.created_at ASC")->fetchAll(); } catch (PDOException $e) {}
-    try { $pendingCategories = $pdo->query("SELECT * FROM shop_categories WHERE is_approved = 0")->fetchAll(); } catch (PDOException $e) { $pendingCategories = []; }
+
+    try {
+        $pendingTopics = $pdo->query("
+            SELECT t.*, COALESCE(u.username, 'deleted') as username, COALESCE(c.title, 'Без раздела') as cat_title
+            FROM topics t
+            LEFT JOIN users u ON t.user_id = u.id
+            LEFT JOIN categories c ON t.category_id = c.id
+            WHERE t.is_approved = 0
+            ORDER BY t.created_at ASC
+        ")->fetchAll();
+    } catch (PDOException $e) {
+        $pendingTopics = [];
+    }
+
+    try {
+        $pendingCategories = $pdo->query("SELECT * FROM categories WHERE is_approved = 0 ORDER BY id ASC")->fetchAll();
+    } catch (PDOException $e) {
+        $pendingCategories = [];
+    }
 }
 
+$activeForumBan = getActiveForumBan($pdo, (int)$user['id'], null);
 
 // --- 4. ДАННЫЕ ПРОФИЛЯ ---
 $myPosts = [];
 try {
     $stmtPosts = $pdo->prepare("SELECT p.*, t.title as topic_title FROM posts p LEFT JOIN topics t ON p.topic_id = t.id WHERE p.user_id = ? ORDER BY p.created_at DESC LIMIT 5");
-    $stmtPosts->execute([$_SESSION['user_id']]);
+    $stmtPosts->execute([(int)$_SESSION['user_id']]);
     $myPosts = $stmtPosts->fetchAll();
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+    $myPosts = [];
+}
 
 $orders = [];
 $totalSpent = 0;
 try {
     $stmtOrders = $pdo->prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC");
-    $stmtOrders->execute([$_SESSION['user_id']]);
+    $stmtOrders->execute([(int)$_SESSION['user_id']]);
     $orders = $stmtOrders->fetchAll();
-    foreach($orders as $ord) {
+    foreach ($orders as $ord) {
         if ($ord['status'] !== 'cancelled') {
-            $amount = isset($ord['total_amount']) ? $ord['total_amount'] : ($ord['total_price'] ?? 0);
-            $totalSpent += $amount;
+            $totalSpent += (float)($ord['total_amount'] ?? 0);
         }
     }
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+    $orders = [];
+}
 
-$avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['avatar'])) ? '/' . $user['avatar'] : null;
+$avatarUrl = getAvatarUrl($user['avatar'] ?? null);
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-    /* === ФОН NEON GRID === */
+    /* === ФОН И БАЗА === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px; perspective: 500px; transform-style: preserve-3d; animation: grid-move 6s linear infinite; box-shadow: inset 0 0 150px rgba(0,0,0,0.9); z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 40px 40px; }
 
     /* === СТИЛИ === */
     .profile-card { background: #fff; color: #000; border: 3px solid #000; box-shadow: 10px 10px 0 #000; }
@@ -180,31 +228,45 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
 <div class="container py-3 py-md-5" style="position: relative; z-index: 2;">
     
     <?php if (isset($_SESSION['flash'])): ?>
-        <div class="alert alert-<?= $_SESSION['flash_type'] ?> border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font text-dark">
-            <?= $_SESSION['flash']; unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+        <?php
+            $allowedFlashTypes = ['success', 'danger', 'warning', 'info', 'dark'];
+            $fType = in_array($_SESSION['flash_type'] ?? 'info', $allowedFlashTypes, true) ? $_SESSION['flash_type'] : 'info';
+        ?>
+        <div class="alert alert-<?= e($fType) ?> border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font text-dark">
+            <?= e($_SESSION['flash']); unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($activeForumBan): ?>
+        <div class="alert alert-danger border-3 border-dark rounded-0 fw-bold mb-4 shadow-sm">
+            <i class="bi bi-slash-circle-fill me-2"></i>
+            Ваш доступ к публикациям и комментариям на форуме ограничен
+            <?= $activeForumBan['expires_at'] ? 'до ' . e(date('d.m.Y H:i', strtotime($activeForumBan['expires_at']))) : 'бессрочно' ?>.
+            Причина: <?= e($activeForumBan['reason'] ?: 'Нарушение правил форума') ?>.
+            <span class="d-block small text-dark mt-1">Оформление и отслеживание заказов в магазине по-прежнему доступны.</span>
         </div>
     <?php endif; ?>
 
     <div class="row g-4">
-        
+
         <div class="col-12 col-md-4 col-lg-3 order-1">
             <div class="profile-card d-flex flex-column mb-4">
                 <div class="bg-black text-white text-center py-3 street-font border-bottom border-dark">
-                    <?= htmlspecialchars($user['username']) ?>
+                    <?= e($user['username']) ?>
                 </div>
                 <div class="p-4 text-center flex-grow-1">
                     <div class="mx-auto mb-3 border-2 border-dark d-flex align-items-center justify-content-center overflow-hidden bg-light position-relative" style="width: 140px; height: 140px; border-radius: 50%;">
                         <?php if ($avatarUrl): ?>
-                            <img src="<?= $avatarUrl ?>" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+                            <img src="<?= e($avatarUrl) ?>" alt="<?= e($user['username']) ?>" style="width: 100%; height: 100%; object-fit: cover;">
                         <?php else: ?>
-                            <span class="display-3 street-font text-muted"><?= strtoupper(substr($user['username'], 0, 1)) ?></span>
+                            <span class="display-3 street-font text-muted"><?= e(safeFirstChar($user['username'])) ?></span>
                         <?php endif; ?>
                     </div>
                     <div class="mb-4">
-                        <span class="badge bg-warning text-dark border border-dark rounded-0 px-3 py-2 text-uppercase street-font"><?= strtoupper($user['role']) ?></span>
-                        <div class="small text-muted fw-bold mt-2 text-uppercase font-monospace">ID: #<?= $user['id'] ?></div>
+                        <span class="badge bg-warning text-dark border border-dark rounded-0 px-3 py-2 text-uppercase street-font"><?= e(strtoupper((string)$user['role'])) ?></span>
+                        <div class="small text-muted fw-bold mt-2 text-uppercase font-monospace">ID: #<?= (int)$user['id'] ?></div>
                     </div>
-                    <?php if ($user['role'] === 'super_admin'): ?>
+                    <?php if ($isModerator): ?>
                         <div class="mb-3">
                             <a href="/admin/index.php" class="btn btn-dark w-100 rounded-0 street-font border-2 border-warning text-warning py-2 shadow-sm">★ АДМИН ПАНЕЛЬ</a>
                         </div>
@@ -220,18 +282,21 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                     </div>
                 </div>
                 <div class="border-top border-dark p-0">
-                    <a href="/actions/logout.php" class="btn btn-light w-100 rounded-0 street-font py-3 hover-bg-gray">Выйти</a>
+                    <form action="/actions/logout.php" method="POST">
+                        <?= csrfField() ?>
+                        <button type="submit" class="btn btn-light w-100 rounded-0 street-font py-3 hover-bg-gray">Выйти</button>
+                    </form>
                 </div>
             </div>
         </div>
 
         <div class="col-12 col-md-8 col-lg-9 order-2">
-            
+
             <?php if ($isModerator): ?>
                 <div class="mb-5">
                     <h4 class="street-font text-white mb-3"><i class="bi bi-shield-lock-fill text-danger"></i> Центр управления</h4>
-                    <?php if ($modMessage): ?><div class="alert alert-success border-3 border-dark rounded-0 fw-bold text-center mb-3"><?= $modMessage ?></div><?php endif; ?>
-                    <?php if ($modError): ?><div class="alert alert-danger border-3 border-dark rounded-0 fw-bold text-center mb-3"><?= $modError ?></div><?php endif; ?>
+                    <?php if ($modMessage): ?><div class="alert alert-success border-3 border-dark rounded-0 fw-bold text-center mb-3"><?= e($modMessage) ?></div><?php endif; ?>
+                    <?php if ($modError): ?><div class="alert alert-danger border-3 border-dark rounded-0 fw-bold text-center mb-3"><?= e($modError) ?></div><?php endif; ?>
 
                     <div class="row g-4">
                         <div class="col-lg-6">
@@ -243,8 +308,15 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                                     <?php else: ?>
                                         <?php foreach ($pendingTopics as $pt): ?>
                                             <div class="p-2 border-bottom border-dark bg-white d-flex justify-content-between align-items-center">
-                                                <div class="text-truncate me-2"><small class="fw-bold d-block text-truncate"><?= htmlspecialchars($pt['title']) ?></small></div>
-                                                <form method="POST"><input type="hidden" name="approve_topic_id" value="<?= $pt['id'] ?>"><button class="btn btn-sm btn-success rounded-0 fw-bold border-dark">ОК</button></form>
+                                                <div class="text-truncate me-2">
+                                                    <small class="fw-bold d-block text-truncate"><?= e($pt['title']) ?></small>
+                                                    <small class="text-muted">@<?= e($pt['username']) ?> · <?= e($pt['cat_title']) ?></small>
+                                                </div>
+                                                <form method="POST" class="flex-shrink-0">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="approve_topic_id" value="<?= (int)$pt['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-0 fw-bold border-dark">ОК</button>
+                                                </form>
                                             </div>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -253,15 +325,26 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                         </div>
                         <div class="col-lg-6">
                             <div class="card border-3 border-primary rounded-0 h-100 mod-card">
-                                <div class="card-header bg-primary text-white street-font">Категории (<?= count($pendingCategories) ?>)</div>
+                                <div class="card-header bg-primary text-white street-font">Разделы форума (<?= count($pendingCategories) ?>)</div>
                                 <div class="card-body bg-light p-0 custom-scroll" style="max-height: 200px; overflow-y: auto;">
                                     <?php if (empty($pendingCategories)): ?>
                                         <div class="p-3 text-center text-muted small fw-bold text-uppercase">Пусто</div>
                                     <?php else: ?>
                                         <?php foreach ($pendingCategories as $pc): ?>
-                                            <div class="p-2 border-bottom border-dark bg-white d-flex justify-content-between">
-                                                <small class="fw-bold"><?= htmlspecialchars($pc['title']) ?></small>
-                                                <form method="POST"><input type="hidden" name="approve_cat_id" value="<?= $pc['id'] ?>"><button class="btn btn-sm btn-success rounded-0 fw-bold border-dark">ОК</button></form>
+                                            <div class="p-2 border-bottom border-dark bg-white d-flex justify-content-between align-items-center gap-2">
+                                                <small class="fw-bold text-truncate"><?= e($pc['title']) ?></small>
+                                                <div class="d-flex gap-1 flex-shrink-0">
+                                                    <form method="POST">
+                                                        <?= csrfField() ?>
+                                                        <input type="hidden" name="approve_cat_id" value="<?= (int)$pc['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-success rounded-0 fw-bold border-dark">ОК</button>
+                                                    </form>
+                                                    <form method="POST">
+                                                        <?= csrfField() ?>
+                                                        <input type="hidden" name="delete_cat_id" value="<?= (int)$pc['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-0 fw-bold border-dark" aria-label="Удалить раздел">&times;</button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -270,27 +353,36 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                         </div>
                         <div class="col-12">
                             <div class="card border-3 border-dark rounded-0 mod-card">
-                                <div class="card-header bg-black text-danger street-font border-bottom border-dark"><i class="bi bi-hammer me-2"></i> Банхаммер</div>
+                                <div class="card-header bg-black text-danger street-font border-bottom border-dark"><i class="bi bi-hammer me-2"></i> Банхаммер форума</div>
                                 <div class="card-body bg-white p-3">
                                     <form method="POST">
-                                        <div class="input-group">
+                                        <?= csrfField() ?>
+                                        <div class="input-group flex-wrap">
                                             <span class="input-group-text bg-danger text-white border-2 border-dark rounded-0 fw-bold street-font">БАН</span>
-                                            <input type="text" name="ban_user_input" class="form-control ban-input" placeholder="Ник или ID жертвы" required style="min-width: 120px;">
-                                            <input type="number" name="ban_amount" class="form-control ban-input text-center" value="1" min="1" placeholder="Срок" style="max-width: 80px;">
-                                            <select name="ban_unit" class="form-select ban-input" id="banUnitSelect" style="max-width: 100px;">
+                                            <input type="text" name="ban_user_input" class="form-control ban-input" placeholder="Ник или ID" aria-label="Ник или ID пользователя" required style="min-width: 120px;">
+                                            <?php if ($supportsTopicBan): ?>
+                                                <input type="number" name="ban_topic_id" class="form-control ban-input text-center" placeholder="ID темы (опц.)" aria-label="ID темы (необязательно)" min="1" style="max-width: 130px;">
+                                            <?php endif; ?>
+                                            <input type="number" name="ban_amount" class="form-control ban-input text-center" value="1" min="1" aria-label="Срок" style="max-width: 80px;">
+                                            <select name="ban_unit" class="form-select ban-input" id="banUnitSelect" aria-label="Единица срока" style="max-width: 110px;">
                                                 <option value="days">Дней</option>
                                                 <option value="hours">Часов</option>
                                                 <option value="months">Месяцев</option>
                                                 <option value="perm">НАВСЕГДА</option>
                                             </select>
-                                            <input type="text" name="ban_reason" class="form-control ban-input" placeholder="Причина бана..." style="min-width: 150px;">
+                                            <input type="text" name="ban_reason" class="form-control ban-input" placeholder="Причина..." aria-label="Причина" style="min-width: 150px;">
                                             <button type="submit" class="btn btn-black rounded-0 street-font text-danger border-2 border-dark px-4" style="background: #000;">ВЫПОЛНИТЬ</button>
                                         </div>
+                                        <div class="form-text fw-bold text-muted mt-1">Ограничение действует только на форуме (пустой ID темы = весь форум); заказы в магазине не блокируются.</div>
                                     </form>
                                     <form method="POST" class="mt-3">
-                                        <div class="input-group">
+                                        <?= csrfField() ?>
+                                        <div class="input-group flex-wrap">
                                             <span class="input-group-text bg-success text-white border-2 border-dark rounded-0 fw-bold street-font">UNBAN</span>
-                                            <input type="text" name="unban_user_input" class="form-control ban-input" placeholder="Ник или ID для разбана" required>
+                                            <input type="text" name="unban_user_input" class="form-control ban-input" placeholder="Ник или ID для снятия бана" aria-label="Ник или ID для разбана" required>
+                                            <?php if ($supportsTopicBan): ?>
+                                                <input type="number" name="unban_topic_id" class="form-control ban-input text-center" placeholder="ID темы (опц.)" aria-label="ID темы (необязательно)" min="1" style="max-width: 130px;">
+                                            <?php endif; ?>
                                             <button type="submit" class="btn btn-outline-success rounded-0 street-font border-2 border-dark px-4">РАЗБАНИТЬ</button>
                                         </div>
                                     </form>
@@ -308,23 +400,24 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                 </div>
                 <div class="card-body p-4">
                     <form action="/actions/update_profile.php" method="POST" id="profileForm">
+                        <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
-                                <label class="form-label-sm">ФИО</label>
-                                <input type="text" name="full_name" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Иванов Иван" value="<?= htmlspecialchars($user['full_name'] ?? '') ?>">
+                                <label for="profileFullName" class="form-label-sm">ФИО</label>
+                                <input type="text" id="profileFullName" name="full_name" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Иванов Иван" value="<?= e($user['full_name'] ?? '') ?>">
                             </div>
                             <div class="col-12 col-md-6 position-relative">
-                                <label class="form-label-sm">ГОРОД</label>
-                                <input type="text" id="cityInput" name="city" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Начните вводить..." value="<?= htmlspecialchars($user['city'] ?? '') ?>" autocomplete="off">
+                                <label for="cityInput" class="form-label-sm">ГОРОД</label>
+                                <input type="text" id="cityInput" name="city" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Начните вводить..." value="<?= e($user['city'] ?? '') ?>" autocomplete="off">
                                 <div id="cityList" class="suggestions-list"></div>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label-sm">ТЕЛЕФОН</label>
-                                <input type="text" id="phoneInput" name="phone" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="+7 (___) ___-__-__" value="<?= htmlspecialchars($user['phone'] ?? '') ?>">
+                                <label for="phoneInput" class="form-label-sm">ТЕЛЕФОН</label>
+                                <input type="text" id="phoneInput" name="phone" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="+7 (999) 000-00-00" value="<?= e($user['phone'] ?? '') ?>">
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label-sm">АДРЕС</label>
-                                <input type="text" name="address" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Улица, дом, кв" value="<?= htmlspecialchars($user['address'] ?? '') ?>">
+                                <label for="profileAddress" class="form-label-sm">АДРЕС</label>
+                                <input type="text" id="profileAddress" name="address" class="form-control border-2 border-dark rounded-0 fw-bold" placeholder="Улица, дом, кв" value="<?= e($user['address'] ?? '') ?>">
                             </div>
 
                             <div class="col-12 mt-4">
@@ -337,7 +430,7 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                                         </div>
                                     </div>
                                     <div class="form-check form-switch p-0 m-0">
-                                        <input class="form-check-input street-checkbox-switch" type="checkbox" name="data_consent" id="data_consent" <?= (isset($user['data_consent']) && $user['data_consent'] ? 'checked' : '') ?>>
+                                        <input class="form-check-input street-checkbox-switch" type="checkbox" name="data_consent" id="data_consent" <?= !empty($user['data_consent']) ? 'checked' : '' ?>>
                                     </div>
                                 </div>
                             </div>
@@ -354,14 +447,16 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                             <span class="badge bg-warning text-dark rounded-0 street-font"><?= count($orders) ?></span>
                         </div>
                         <div class="list-group list-group-flush custom-scroll flex-grow-1" style="max-height: 300px; overflow-y: auto;">
-                            <?php if(empty($orders)): ?>
+                            <?php if (empty($orders)): ?>
                                 <div class="list-group-item text-center text-muted py-5 border-0"><i class="bi bi-cart-x fs-1 d-block mb-2 opacity-50"></i><span class="small fw-bold text-uppercase street-font">История пуста</span></div>
                             <?php else: ?>
-                                <?php foreach($orders as $ord): ?>
-                                    <?php 
-                                        $amount = isset($ord['total_amount']) ? $ord['total_amount'] : ($ord['total_price'] ?? 0);
+                                <?php foreach ($orders as $ord): ?>
+                                    <?php
+                                        $amount = (float)($ord['total_amount'] ?? 0);
                                         switch ($ord['status']) {
                                             case 'new': $statusClass = 'bg-warning text-dark'; break;
+                                            case 'processing': $statusClass = 'bg-info text-dark'; break;
+                                            case 'shipped': $statusClass = 'bg-primary text-white'; break;
                                             case 'completed': $statusClass = 'bg-success text-white'; break;
                                             case 'cancelled': $statusClass = 'bg-danger text-white'; break;
                                             default: $statusClass = 'bg-secondary text-white';
@@ -369,12 +464,12 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                                     ?>
                                     <a href="/pages/my_orders.php" class="list-group-item list-group-item-action py-3 px-3 border-bottom list-hover-effect">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="street-font text-dark">#<?= $ord['id'] ?></span>
+                                            <span class="street-font text-dark">#<?= (int)$ord['id'] ?></span>
                                             <span class="street-font fs-5 text-dark"><?= number_format($amount, 0, '', ' ') ?> ₽</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <small class="text-muted fw-bold font-monospace"><?= date('d.m.y', strtotime($ord['created_at'])) ?></small>
-                                            <span class="badge <?= $statusClass ?> rounded-0 text-uppercase border border-dark fw-bold" style="font-size: 0.65rem;"><?= $ord['status'] ?></span>
+                                            <small class="text-muted fw-bold font-monospace"><?= e(date('d.m.y', strtotime((string)$ord['created_at']))) ?></small>
+                                            <span class="badge <?= e($statusClass) ?> rounded-0 text-uppercase border border-dark fw-bold" style="font-size: 0.65rem;"><?= e($ord['status']) ?></span>
                                         </div>
                                     </a>
                                 <?php endforeach; ?>
@@ -390,16 +485,16 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                     <div class="card border-3 border-dark h-100 mb-0 profile-card">
                         <div class="card-header bg-white text-dark border-bottom border-dark py-2 street-font">Активность на форуме</div>
                         <div class="list-group list-group-flush">
-                            <?php if(empty($myPosts)): ?>
+                            <?php if (empty($myPosts)): ?>
                                 <div class="list-group-item text-center text-muted py-5 border-0 street-font">Нет активности</div>
                             <?php else: ?>
-                                <?php foreach($myPosts as $mp): ?>
-                                    <a href="/pages/topic.php?id=<?= $mp['topic_id'] ?>#post-<?= $mp['id'] ?>" class="list-group-item list-group-item-action py-3 border-bottom list-hover-effect">
+                                <?php foreach ($myPosts as $mp): ?>
+                                    <a href="/pages/topic.php?id=<?= (int)$mp['topic_id'] ?>#post-<?= (int)$mp['id'] ?>" class="list-group-item list-group-item-action py-3 border-bottom list-hover-effect">
                                         <div class="d-flex justify-content-between mb-1">
-                                            <strong class="text-truncate small text-uppercase street-font" style="max-width: 70%;"><?= htmlspecialchars($mp['topic_title'] ?? 'Тема удалена') ?></strong>
-                                            <small class="text-muted fw-bold" style="font-size: 0.7rem;"><?= date('d.m', strtotime($mp['created_at'])) ?></small>
+                                            <strong class="text-truncate small text-uppercase street-font" style="max-width: 70%;"><?= e($mp['topic_title'] ?? 'Тема удалена') ?></strong>
+                                            <small class="text-muted fw-bold" style="font-size: 0.7rem;"><?= e(date('d.m', strtotime((string)$mp['created_at']))) ?></small>
                                         </div>
-                                        <div class="text-secondary text-truncate small fst-italic">"<?= htmlspecialchars($mp['content']) ?>"</div>
+                                        <div class="text-secondary text-truncate small fst-italic">"<?= e($mp['content']) ?>"</div>
                                     </a>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -411,25 +506,47 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
     </div>
 </div>
 
-<div class="modal fade" id="avatarModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-3 border-dark rounded-0"><div class="modal-header bg-warning border-bottom border-dark py-2"><h6 class="modal-title street-font">АВАТАР</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-3"><form action="/actions/upload_avatar.php" method="POST" enctype="multipart/form-data"><input type="file" name="avatar" class="form-control form-control-sm mb-3 border-dark rounded-0" required accept="image/*"><button type="submit" class="btn btn-street w-100 btn-sm">ЗАГРУЗИТЬ</button></form></div></div></div></div>
+<div class="modal fade" id="avatarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-3 border-dark rounded-0">
+            <div class="modal-header bg-warning border-bottom border-dark py-2">
+                <h6 class="modal-title street-font">АВАТАР</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body p-3">
+                <form action="/actions/upload_avatar.php" method="POST" enctype="multipart/form-data">
+                    <?= csrfField() ?>
+                    <input type="file" name="avatar" class="form-control form-control-sm mb-3 border-dark rounded-0" required accept="image/jpeg,image/png,image/webp,image/gif">
+                    <button type="submit" class="btn btn-street w-100 btn-sm">ЗАГРУЗИТЬ</button>
+                </form>
+                <?php if ($avatarUrl): ?>
+                    <form action="/actions/delete_avatar.php" method="POST" class="mt-2">
+                        <?= csrfField() ?>
+                        <button type="submit" class="btn btn-outline-danger w-100 btn-sm rounded-0 street-font">УДАЛИТЬ ФОТО</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
 
-<div class="modal fade" id="passwordConfirmModal" tabindex="-1">
+<div class="modal fade" id="passwordConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-3 border-dark rounded-0">
             <div class="modal-header bg-warning border-bottom-4 border-dark">
                 <h5 class="modal-title street-font"><i class="bi bi-shield-lock-fill me-2"></i> Сохранение данных</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body p-4 bg-white">
                 <div class="alert alert-warning border-2 border-warning rounded-0 d-flex align-items-start mb-3 bg-warning bg-opacity-10">
-                    <div class="me-3 mt-1"><i class="bi bi-info-circle-fill fs-3 text-warning text-dark"></i></div>
+                    <div class="me-3 mt-1"><i class="bi bi-info-circle-fill fs-3 text-dark"></i></div>
                     <div>
                         <strong class="text-uppercase text-dark street-font">Проверка безопасности</strong>
                         <p class="small fw-bold mb-0 text-dark opacity-75">Вы обновляете личную информацию. Чтобы никто не изменил её без вашего ведома, подтвердите действие паролем.</p>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold small text-uppercase text-muted street-font">Ваш текущий пароль:</label>
+                    <label for="confirmPasswordInput" class="form-label fw-bold small text-uppercase text-muted street-font">Ваш текущий пароль:</label>
                     <input type="password" id="confirmPasswordInput" class="form-control form-control-lg border-2 border-dark text-center street-font rounded-0" placeholder="••••••••">
                 </div>
                 <button type="button" id="confirmSaveBtn" class="btn btn-black w-100 rounded-0 street-font border-2 border-dark py-3 shadow-sm text-warning" style="background: #000;">Подтвердить и сохранить</button>
@@ -438,12 +555,12 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
     </div>
 </div>
 
-<div class="modal fade" id="deleteProfileModal" tabindex="-1">
+<div class="modal fade" id="deleteProfileModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-0 border-4 border-danger">
             <div class="modal-header bg-danger text-white border-bottom-4 border-dark">
                 <h5 class="modal-title street-font"><i class="bi bi-exclamation-triangle-fill me-2"></i> УДАЛЕНИЕ АККАУНТА</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body p-4 bg-white">
                 <div class="alert alert-danger border-2 border-danger rounded-0 d-flex align-items-center mb-4 bg-danger bg-opacity-10">
@@ -459,10 +576,11 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
                     </div>
                 </div>
                 <form action="/actions/delete_profile.php" method="POST">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="self_delete">
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-uppercase street-font">Подтвердите паролем:</label>
-                        <input type="password" name="password" class="form-control rounded-0 border-2 border-dark fw-bold text-center" placeholder="Ваш текущий пароль" required>
+                        <label for="deleteProfilePassword" class="form-label fw-bold small text-uppercase street-font">Подтвердите паролем:</label>
+                        <input type="password" id="deleteProfilePassword" name="password" class="form-control rounded-0 border-2 border-dark fw-bold text-center" placeholder="Ваш текущий пароль" required>
                     </div>
                     <button type="submit" class="btn btn-danger w-100 rounded-0 street-font border-2 border-dark py-3 shadow-sm">Я всё понял, удалить навсегда</button>
                 </form>
@@ -476,27 +594,91 @@ $avatarUrl = (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['a
 document.addEventListener('DOMContentLoaded', function() {
     const phoneEl = document.getElementById('phoneInput');
     if (phoneEl && window.IMask) IMask(phoneEl, { mask: '+{7} (000) 000-00-00' });
-    const token = "a5944510b64d081f93f9c73d937015494191c01e";
-    const cityInput = document.getElementById("cityInput");
-    const cityList = document.getElementById("cityList");
-    if (cityInput) {
-        cityInput.addEventListener("input", function() {
-            const query = this.value;
-            if (query.length < 2) { cityList.style.display = 'none'; return; }
-            fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address", { method: "POST", mode: "cors", headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": "Token " + token }, body: JSON.stringify({ query: query, from_bound: { value: "city" }, to_bound: { value: "settlement" }, count: 5 }) }).then(r => r.json()).then(res => {
-                cityList.innerHTML = '';
-                if (res.suggestions.length > 0) { cityList.style.display = 'block'; res.suggestions.forEach(item => { const div = document.createElement("div"); div.className = "suggestion-item"; div.textContent = item.data.city || item.value; div.onclick = function() { cityInput.value = item.data.city || item.value; cityList.style.display = 'none'; }; cityList.appendChild(div); }); } else { cityList.style.display = 'none'; }
-            }).catch(e => console.log(e));
+
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+    const cityInput = document.getElementById('cityInput');
+    const cityList = document.getElementById('cityList');
+
+    if (cityInput && cityList) {
+        let cityTimer;
+        cityInput.addEventListener('input', function() {
+            clearTimeout(cityTimer);
+            const query = this.value.trim();
+            if (query.length < 2) {
+                cityList.style.display = 'none';
+                return;
+            }
+            cityTimer = setTimeout(() => {
+                fetch('/api/dadata_suggest.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({ type: 'address', query: query })
+                })
+                .then(r => r.ok ? r.json() : { suggestions: [] })
+                .then(res => {
+                    cityList.replaceChildren();
+                    const list = Array.isArray(res.suggestions) ? res.suggestions : [];
+                    if (list.length > 0) {
+                        cityList.style.display = 'block';
+                        list.forEach(item => {
+                            const val = (item.data && item.data.city) ? item.data.city : (item.value || '');
+                            if (!val) return;
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = val;
+                            div.addEventListener('click', function() {
+                                cityInput.value = val;
+                                cityList.style.display = 'none';
+                            });
+                            cityList.appendChild(div);
+                        });
+                    } else {
+                        cityList.style.display = 'none';
+                    }
+                })
+                .catch(() => { cityList.style.display = 'none'; });
+            }, 250);
         });
-        document.addEventListener('click', e => { if (e.target !== cityInput && e.target !== cityList) cityList.style.display = 'none'; });
+
+        document.addEventListener('click', e => {
+            if (e.target !== cityInput && e.target !== cityList) {
+                cityList.style.display = 'none';
+            }
+        });
     }
+
     const saveBtn = document.getElementById('saveProfileBtn');
     const confirmBtn = document.getElementById('confirmSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => new bootstrap.Modal(document.getElementById('passwordConfirmModal')).show());
-    if (confirmBtn) confirmBtn.addEventListener('click', () => { const pwd = document.getElementById('confirmPasswordInput').value; if (!pwd) { alert('Пароль обязателен!'); return; } const form = document.getElementById('profileForm'); const h = document.createElement('input'); h.type='hidden'; h.name='password_confirm'; h.value=pwd; form.appendChild(h); form.submit(); });
+    if (confirmBtn) confirmBtn.addEventListener('click', () => {
+        const pwd = document.getElementById('confirmPasswordInput').value;
+        if (!pwd) { alert('Пароль обязателен!'); return; }
+        const form = document.getElementById('profileForm');
+        const h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = 'password_confirm';
+        h.value = pwd;
+        form.appendChild(h);
+        form.submit();
+    });
+
     const banUnitSelect = document.getElementById('banUnitSelect');
     const banAmountInput = document.querySelector('input[name="ban_amount"]');
-    if(banUnitSelect && banAmountInput) { banUnitSelect.addEventListener('change', function() { if(this.value === 'perm') { banAmountInput.disabled = true; banAmountInput.value = ''; } else { banAmountInput.disabled = false; if(banAmountInput.value === '') banAmountInput.value = '1'; } }); }
+    if (banUnitSelect && banAmountInput) {
+        banUnitSelect.addEventListener('change', function() {
+            if (this.value === 'perm') {
+                banAmountInput.disabled = true;
+                banAmountInput.value = '';
+            } else {
+                banAmountInput.disabled = false;
+                if (banAmountInput.value === '') banAmountInput.value = '1';
+            }
+        });
+    }
 });
 </script>
 

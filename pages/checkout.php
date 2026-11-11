@@ -1,70 +1,46 @@
 ﻿<?php
 // pages/checkout.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/header.php';
 
 $sessId = session_id();
 
-// 1. Проверяем корзину
-$sql = "SELECT c.quantity, p.title, p.price, p.image 
+// 1. Проверяем корзину до вывода header
+$sql = "SELECT c.quantity, p.title, p.price, p.image
         FROM cart c
-        JOIN products p ON c.product_id = p.id
+        JOIN products p ON c.product_id = p.id AND p.is_active = 1
         WHERE c.session_id = ?";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$sessId]);
 $cartItems = $stmt->fetchAll();
 
 if (empty($cartItems)) {
-    echo "<script>window.location='/pages/catalog.php';</script>";
-    exit;
+    redirectWithFlash('/pages/catalog.php', 'Корзина пуста.', 'warning');
 }
 
 // Считаем итог
 $total = 0;
-foreach($cartItems as $item) {
-    $total += $item['price'] * $item['quantity'];
+foreach ($cartItems as $item) {
+    $total += (float)$item['price'] * (int)$item['quantity'];
 }
 
 // 2. Получаем данные пользователя
-$user = []; 
+$user = [];
 if (isset($_SESSION['user_id'])) {
-    $uStmt = $pdo->prepare("SELECT username, email, phone, city, address FROM users WHERE id = ?");
-    $uStmt->execute([$_SESSION['user_id']]);
-    $user = $uStmt->fetch(PDO::FETCH_ASSOC);
+    $uStmt = $pdo->prepare("SELECT username, full_name, email, phone, city, address FROM users WHERE id = ?");
+    $uStmt->execute([(int)$_SESSION['user_id']]);
+    $user = $uStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 }
+
+$defaultName = !empty($user['full_name']) ? $user['full_name'] : ($user['username'] ?? '');
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === СТИЛИ ФОРМЫ === */
     .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
@@ -160,12 +136,13 @@ if (isset($_SESSION['user_id'])) {
         </h1>
     </div>
 
-    <form action="/actions/place_order.php" method="POST" class="needs-validation">
+    <form action="/actions/place_order.php" method="POST" class="needs-validation" id="checkoutForm">
+        <?= csrfField() ?>
         <div class="row g-5">
-            
+
             <!-- ЛЕВАЯ КОЛОНКА: ФОРМА -->
             <div class="col-lg-7">
-                
+
                 <!-- 1. КОНТАКТЫ -->
                 <div class="card rounded-0 checkout-card mb-5">
                     <div class="card-header checkout-header rounded-0 py-3">
@@ -175,25 +152,25 @@ if (isset($_SESSION['user_id'])) {
                         <div class="row g-3">
                             <!-- ИМЯ -->
                             <div class="col-12">
-                                <label class="form-label small">ФИО / Псевдоним</label>
-                                <input type="text" name="name" class="form-control form-control-lg" 
-                                       value="<?= htmlspecialchars($user['username'] ?? '') ?>" 
+                                <label for="checkoutName" class="form-label small">ФИО / Псевдоним</label>
+                                <input type="text" id="checkoutName" name="name" class="form-control form-control-lg"
+                                       value="<?= e($defaultName) ?>"
                                        required placeholder="Иван Иванов">
                             </div>
 
                             <!-- ТЕЛЕФОН -->
                             <div class="col-md-6">
-                                <label class="form-label small">Телефон</label>
-                                <input type="tel" name="phone" id="phoneInput" class="form-control form-control-lg" 
-                                       value="<?= htmlspecialchars($user['phone'] ?? '') ?>" 
-                                       required placeholder="+7 (___) ___-__-__">
+                                <label for="phoneInput" class="form-label small">Телефон</label>
+                                <input type="tel" name="phone" id="phoneInput" class="form-control form-control-lg"
+                                       value="<?= e($user['phone'] ?? '') ?>"
+                                       required placeholder="+7 (999) 000-00-00">
                             </div>
 
                             <!-- EMAIL -->
                             <div class="col-md-6">
-                                <label class="form-label small">Email</label>
-                                <input type="email" name="email" class="form-control form-control-lg" 
-                                       value="<?= htmlspecialchars($user['email'] ?? '') ?>" 
+                                <label for="checkoutEmail" class="form-label small">Email</label>
+                                <input type="email" id="checkoutEmail" name="email" class="form-control form-control-lg"
+                                       value="<?= e($user['email'] ?? '') ?>"
                                        required placeholder="mail@example.com">
                             </div>
                         </div>
@@ -209,24 +186,24 @@ if (isset($_SESSION['user_id'])) {
                         <div class="row g-3">
                             <!-- ГОРОД -->
                             <div class="col-12">
-                                <label class="form-label small">Город</label>
-                                <input type="text" name="city" class="form-control form-control-lg" 
-                                       value="<?= htmlspecialchars($user['city'] ?? '') ?>" 
+                                <label for="checkoutCity" class="form-label small">Город</label>
+                                <input type="text" id="checkoutCity" name="city" class="form-control form-control-lg"
+                                       value="<?= e($user['city'] ?? '') ?>"
                                        required placeholder="Москва">
                             </div>
 
                             <!-- АДРЕС -->
                             <div class="col-12">
-                                <label class="form-label small">Адрес</label>
-                                <input type="text" name="address" class="form-control form-control-lg" 
-                                       value="<?= htmlspecialchars($user['address'] ?? '') ?>" 
-                                       required placeholder="Ул. Пушкина, д. Колотушкина">
+                                <label for="checkoutAddress" class="form-label small">Адрес</label>
+                                <input type="text" id="checkoutAddress" name="address" class="form-control form-control-lg"
+                                       value="<?= e($user['address'] ?? '') ?>"
+                                       required placeholder="Ул. Пушкина, д. 10, кв. 5">
                             </div>
 
                             <!-- КОММЕНТАРИЙ -->
                             <div class="col-12">
-                                <label class="form-label small">Комментарий</label>
-                                <textarea name="comment" class="form-control" rows="3" placeholder="Код домофона, этаж, пожелания..."></textarea>
+                                <label for="checkoutComment" class="form-label small">Комментарий</label>
+                                <textarea id="checkoutComment" name="comment" class="form-control" rows="3" placeholder="Код домофона, этаж, пожелания..."></textarea>
                             </div>
                         </div>
                     </div>
@@ -239,9 +216,9 @@ if (isset($_SESSION['user_id'])) {
                     </div>
                     <div class="card-body p-4 bg-white">
                         <div class="d-grid gap-3">
-                            
+
                             <label class="payment-option position-relative">
-                                <input type="radio" name="payment_method" value="card_online" checked class="d-none peer">
+                                <input type="radio" name="payment_method" value="card_online" checked class="visually-hidden peer">
                                 <div class="card-box p-3 d-flex align-items-center">
                                     <div class="check-circle me-3 rounded-circle border border-2 border-dark d-flex align-items-center justify-content-center bg-white" style="width: 24px; height: 24px;">
                                         <div class="dot bg-black rounded-circle" style="width: 12px; height: 12px; display: none;"></div>
@@ -255,7 +232,7 @@ if (isset($_SESSION['user_id'])) {
                             </label>
 
                             <label class="payment-option position-relative">
-                                <input type="radio" name="payment_method" value="cash" class="d-none peer">
+                                <input type="radio" name="payment_method" value="cash" class="visually-hidden peer">
                                 <div class="card-box p-3 d-flex align-items-center">
                                     <div class="check-circle me-3 rounded-circle border border-2 border-dark d-flex align-items-center justify-content-center bg-white" style="width: 24px; height: 24px;">
                                         <div class="dot bg-black rounded-circle" style="width: 12px; height: 12px; display: none;"></div>
@@ -278,22 +255,22 @@ if (isset($_SESSION['user_id'])) {
             <div class="col-lg-5">
                 <div class="card rounded-0 p-4 shadow-lg sticky-top summary-card" style="top: 100px;">
                     <h3 class="street-font mb-4 text-street-yellow border-bottom border-secondary pb-3">Ваш заказ</h3>
-                    
+
                     <!-- Список товаров -->
                     <div class="order-list mb-4 pe-2" style="max-height: 300px; overflow-y: auto;">
-                        <?php foreach($cartItems as $item): ?>
+                        <?php foreach ($cartItems as $item): ?>
                             <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-secondary">
-                                <img src="<?= htmlspecialchars($item['image']) ?>" class="rounded-0 border border-secondary me-3" width="60" height="60" style="object-fit: cover;">
+                                <img src="<?= e(safeUrl($item['image'] ?? '', '')) ?>" alt="<?= e($item['title']) ?>" class="rounded-0 border border-secondary me-3" width="60" height="60" style="object-fit: cover;">
                                 <div class="flex-grow-1">
                                     <div class="street-font text-white small lh-sm mb-1">
-                                        <?= htmlspecialchars($item['title']) ?>
+                                        <?= e($item['title']) ?>
                                     </div>
                                     <div class="small text-white-50 fw-bold">
-                                        <?= $item['quantity'] ?> x <?= number_format($item['price'], 0, '', ' ') ?> ₽
+                                        <?= (int)$item['quantity'] ?> x <?= number_format((float)$item['price'], 0, '', ' ') ?> ₽
                                     </div>
                                 </div>
                                 <div class="street-font text-street-yellow">
-                                    <?= number_format($item['price'] * $item['quantity'], 0, '', ' ') ?>
+                                    <?= number_format((float)$item['price'] * (int)$item['quantity'], 0, '', ' ') ?>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -307,7 +284,7 @@ if (isset($_SESSION['user_id'])) {
                         <span class="text-white-50 fw-bold">Доставка:</span>
                         <span class="fw-bold text-street-yellow street-font">0 ₽</span>
                     </div>
-                    
+
                     <div class="d-flex justify-content-between border-top border-secondary pt-3 mb-4 text-white">
                         <span class="h4 street-font">ИТОГО:</span>
                         <span class="h3 street-font text-street-yellow m-0"><?= number_format($total, 0, '', ' ') ?> ₽</span>
@@ -315,10 +292,10 @@ if (isset($_SESSION['user_id'])) {
 
                     <div class="mb-3 p-3 bg-dark border border-secondary text-start small">
                         <div class="form-check">
-                            <input class="form-check-input rounded-0" type="checkbox" id="checkout_pd_consent" name="checkout_pd_consent" required checked style="accent-color: #FCE300;">
+                            <input class="form-check-input rounded-0" type="checkbox" id="checkout_pd_consent" name="checkout_pd_consent" required style="accent-color: #FCE300;">
                             <label class="form-check-label text-white-50" for="checkout_pd_consent" style="font-size: 0.75rem;">
-                                Я согласен на обработку персональных данных в соответствии с 
-                                <a href="/pages/privacy.php" target="_blank" class="text-street-yellow text-decoration-underline fw-bold">152-ФЗ</a> 
+                                Я согласен на обработку персональных данных в соответствии с
+                                <a href="/pages/privacy.php" target="_blank" class="text-street-yellow text-decoration-underline fw-bold">152-ФЗ</a>
                                 и принимаю условия <a href="/pages/terms.php" target="_blank" class="text-street-yellow text-decoration-underline fw-bold">Публичной оферты</a>.
                             </label>
                         </div>
@@ -327,7 +304,7 @@ if (isset($_SESSION['user_id'])) {
                     <button type="submit" class="btn btn-confirm w-100 rounded-0 text-uppercase py-4 fs-4 shadow-sm">
                         ПОДТВЕРДИТЬ ЗАКАЗ
                     </button>
-                    
+
                     <div class="mt-3 text-center small text-white-50 fw-bold lh-sm" style="font-size: 0.75rem;">
                         Оформляя заказ, вы подтверждаете согласие с <a href="/pages/terms.php" target="_blank" class="text-street-yellow">условиями продажи</a> и <a href="/pages/privacy.php" target="_blank" class="text-street-yellow">обработки данных</a> (152-ФЗ РФ).
                     </div>
@@ -343,10 +320,26 @@ if (isset($_SESSION['user_id'])) {
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const phoneInput = document.getElementById('phoneInput');
-        if (phoneInput) {
+        if (phoneInput && typeof IMask !== 'undefined') {
             IMask(phoneInput, {
-                mask: '+{7} (000) 000-00-00',
-                lazy: false
+                mask: '+{7} (000) 000-00-00'
+            });
+        }
+
+        const form = document.getElementById('checkoutForm');
+        if (form && phoneInput) {
+            form.addEventListener('submit', function(e) {
+                const digits = phoneInput.value.replace(/\D/g, '');
+                if (digits.length < 11) {
+                    e.preventDefault();
+                    phoneInput.setCustomValidity('Введите полный номер телефона');
+                    phoneInput.reportValidity();
+                } else {
+                    phoneInput.setCustomValidity('');
+                }
+            });
+            phoneInput.addEventListener('input', function() {
+                phoneInput.setCustomValidity('');
             });
         }
     });

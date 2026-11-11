@@ -1,55 +1,39 @@
 <?php
 // pages/notifications.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/header.php';
 
-if (!isset($_SESSION['user_id'])) {
-    echo "<script>window.location.href='/pages/login.php';</script>";
-    exit;
+checkAuth('/pages/login.php');
+
+$perPage = 30;
+$page = max(1, (int)($_GET['page'] ?? 1));
+
+$stmtCount = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ?");
+$stmtCount->execute([(int)$_SESSION['user_id']]);
+$totalNotifs = (int)$stmtCount->fetchColumn();
+$totalPages = max(1, (int)ceil($totalNotifs / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
 }
+$offset = ($page - 1) * $perPage;
 
 // Получаем уведомления
-$stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50");
-$stmt->execute([$_SESSION['user_id']]);
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT $perPage OFFSET $offset");
+$stmt->execute([(int)$_SESSION['user_id']]);
 $notifs = $stmt->fetchAll();
 
-// Подсчет непрочитанных для бейджика
-$unreadCount = 0;
-foreach($notifs as $n) { if(!$n['is_read']) $unreadCount++; }
+// Подсчет непрочитанных
+$stmtUnread = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
+$stmtUnread->execute([(int)$_SESSION['user_id']]);
+$unreadCount = (int)$stmtUnread->fetchColumn();
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === СПИСОК УВЕДОМЛЕНИЙ === */
     .notif-container {
@@ -141,10 +125,13 @@ foreach($notifs as $n) { if(!$n['is_read']) $unreadCount++; }
             ТВОИ <span class="text-street-yellow">СИГНАЛЫ</span>
         </h1>
         <div class="d-flex gap-3 mt-3 mt-md-0">
-            <?php if($unreadCount > 0): ?>
-                <a href="/actions/read_all.php" class="btn btn-black rounded-0 text-uppercase px-4 shadow-sm">
-                    <i class="bi bi-check2-all me-2"></i> Прочитать все
-                </a>
+            <?php if ($unreadCount > 0): ?>
+                <form action="/actions/read_all.php" method="POST">
+                    <?= csrfField() ?>
+                    <button type="submit" class="btn btn-black rounded-0 text-uppercase px-4 shadow-sm">
+                        <i class="bi bi-check2-all me-2"></i> Прочитать все
+                    </button>
+                </form>
             <?php endif; ?>
             <a href="/pages/profile.php" class="btn btn-outline-street rounded-0 text-uppercase px-4">
                 <i class="bi bi-arrow-left me-2"></i> Профиль
@@ -166,10 +153,9 @@ foreach($notifs as $n) { if(!$n['is_read']) $unreadCount++; }
         <?php else: ?>
             <div class="list-group list-group-flush rounded-0">
                 <?php foreach ($notifs as $n): ?>
-                    <?php 
-                        // Определение стиля и иконки
+                    <?php
                         $isReadClass = $n['is_read'] ? 'notif-read' : 'notif-unread';
-                        
+
                         $iconClass = 'bi-info-circle-fill';
                         $iconBg = 'bg-white text-dark';
                         $typeLabel = 'СИСТЕМА';
@@ -185,30 +171,28 @@ foreach($notifs as $n) { if(!$n['is_read']) $unreadCount++; }
                         }
                     ?>
 
-                    <a href="/actions/read_notification.php?id=<?= $n['id'] ?>" class="notif-item p-4 <?= $isReadClass ?>">
-                        
-                        <!-- Стрелка при наведении -->
+                    <a href="/actions/read_notification.php?id=<?= (int)$n['id'] ?>" class="notif-item p-4 <?= e($isReadClass) ?>">
+
                         <i class="bi bi-caret-right-fill arrow-indicator"></i>
 
                         <div class="d-flex align-items-start">
-                            <!-- Иконка -->
-                            <div class="icon-box rounded-0 me-3 <?= $iconBg ?>">
-                                <i class="bi <?= $iconClass ?>"></i>
+                            <div class="icon-box rounded-0 me-3 <?= e($iconBg) ?>">
+                                <i class="bi <?= e($iconClass) ?>"></i>
                             </div>
 
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <strong class="text-uppercase small street-font" style="letter-spacing: 1px;">
-                                        <?= $typeLabel ?>
+                                        <?= e($typeLabel) ?>
                                         <span class="badge bg-danger rounded-0 border border-dark text-uppercase ms-2 new-badge" style="font-size: 0.6rem;">NEW</span>
                                     </strong>
                                     <small class="fw-bold text-muted">
-                                        <?= date('d.m H:i', strtotime($n['created_at'])) ?>
+                                        <?= e(date('d.m H:i', strtotime((string)$n['created_at']))) ?>
                                     </small>
                                 </div>
-                                
+
                                 <p class="mb-0 fw-bold fs-5 lh-sm">
-                                    <?= htmlspecialchars($n['message']) ?>
+                                    <?= e($n['message']) ?>
                                 </p>
                             </div>
                         </div>
@@ -217,6 +201,22 @@ foreach($notifs as $n) { if(!$n['is_read']) $unreadCount++; }
             </div>
         <?php endif; ?>
     </div>
+
+    <?php if ($totalPages > 1): ?>
+        <div class="mt-4 d-flex justify-content-between align-items-center bg-black border border-2 border-white p-3">
+            <?php if ($page > 1): ?>
+                <a href="notifications.php?page=<?= $page - 1 ?>" class="btn btn-outline-light rounded-0 btn-sm street-font">Назад</a>
+            <?php else: ?>
+                <span></span>
+            <?php endif; ?>
+            <span class="street-font text-street-yellow small">Стр. <?= $page ?> из <?= $totalPages ?></span>
+            <?php if ($page < $totalPages): ?>
+                <a href="notifications.php?page=<?= $page + 1 ?>" class="btn btn-warning text-dark rounded-0 btn-sm street-font fw-bold">Далее</a>
+            <?php else: ?>
+                <span></span>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

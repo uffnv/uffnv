@@ -1,8 +1,8 @@
-<?php require_once 'layout_header.php'; ?>
-
 <?php
-// Функция генерации SLUG (транслитерация)
-function createSlug($str) {
+// admin/shop_categories.php
+require_once __DIR__ . '/admin_auth.php';
+
+function createSlug(string $str): string {
     $tr = [
         "А"=>"a","Б"=>"b","В"=>"v","Г"=>"g","Д"=>"d","Е"=>"e","Ё"=>"yo","Ж"=>"zh","З"=>"z","И"=>"i","Й"=>"j",
         "К"=>"k","Л"=>"l","М"=>"m","Н"=>"n","О"=>"o","П"=>"p","Р"=>"r","С"=>"s","Т"=>"t","У"=>"u","Ф"=>"f",
@@ -14,86 +14,82 @@ function createSlug($str) {
     ];
     $str = strtr($str, $tr);
     $str = strtolower(preg_replace('/[^a-zA-Z0-9-]/', '', $str));
-    // Убираем двойные дефисы
     $str = preg_replace('/-+/', '-', $str);
-    // Убираем дефисы по краям
     return trim($str, '-');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // ДОБАВЛЕНИЕ
-    if (isset($_POST['add_cat'])) {
-        $title = trim($_POST['title']);
-        if (!empty($title)) {
-            $slug = createSlug($title);
-            // Если slug пустой (например, только спецсимволы), генерируем рандом
-            if (empty($slug)) $slug = 'cat-' . time();
+    requireCsrfOrRedirect('/admin/shop_categories.php');
 
-            // Проверяем уникальность slug (опционально, но желательно)
-            // Для простоты, если дубль - добавим время
-            $check = $pdo->prepare("SELECT id FROM shop_categories WHERE slug = ?");
+    if (isset($_POST['add_cat'])) {
+        $title = trim($_POST['title'] ?? '');
+        if ($title !== '') {
+            $slug = createSlug($title) ?: ('cat-' . time());
+            $check = $pdo->prepare("SELECT id FROM shop_categories WHERE slug = ? LIMIT 1");
             $check->execute([$slug]);
             if ($check->fetch()) {
                 $slug .= '-' . time();
             }
-
-            // Запрос с полем SLUG
-            $stmt = $pdo->prepare("INSERT INTO shop_categories (title, slug) VALUES (?, ?)");
             try {
-                $stmt->execute([$title, $slug]);
-            } catch (PDOException $e) {
-                echo "<script>alert('Ошибка БД: " . $e->getMessage() . "');</script>";
+                $pdo->prepare("INSERT INTO shop_categories (title, slug) VALUES (?, ?)")->execute([$title, $slug]);
+                redirectWithFlash('/admin/shop_categories.php', 'Категория добавлена.', 'success');
+            } catch (\PDOException $e) {
+                error_log("shop_categories add error: " . $e->getMessage());
+                redirectWithFlash('/admin/shop_categories.php', 'Ошибка сохранения категории.', 'danger');
             }
         }
     }
 
-    // УДАЛЕНИЕ
     if (isset($_POST['delete_cat'])) {
-        $pdo->prepare("DELETE FROM shop_categories WHERE id = ?")->execute([(int)$_POST['id']]);
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $pdo->prepare("UPDATE products SET category_id = 0 WHERE category_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM shop_categories WHERE id = ?")->execute([$id]);
+            redirectWithFlash('/admin/shop_categories.php', 'Категория удалена.', 'warning');
+        }
     }
 
-    // РЕДАКТИРОВАНИЕ
     if (isset($_POST['edit_cat'])) {
-        $title = trim($_POST['title']);
-        $id = (int)$_POST['id'];
-        if (!empty($title)) {
-            $slug = createSlug($title); // Обновляем и слаг тоже
-             // Проверка на дубликат слага исключая текущую категорию
-            $check = $pdo->prepare("SELECT id FROM shop_categories WHERE slug = ? AND id != ?");
+        $title = trim($_POST['title'] ?? '');
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0 && $title !== '') {
+            $slug = createSlug($title) ?: ('cat-' . time());
+            $check = $pdo->prepare("SELECT id FROM shop_categories WHERE slug = ? AND id != ? LIMIT 1");
             $check->execute([$slug, $id]);
             if ($check->fetch()) {
                 $slug .= '-' . time();
             }
-
-            $stmt = $pdo->prepare("UPDATE shop_categories SET title = ?, slug = ? WHERE id = ?");
-            $stmt->execute([$title, $slug, $id]);
+            $pdo->prepare("UPDATE shop_categories SET title = ?, slug = ? WHERE id = ?")->execute([$title, $slug, $id]);
+            redirectWithFlash('/admin/shop_categories.php', 'Категория обновлена.', 'success');
         }
     }
+
+    redirectWithFlash('/admin/shop_categories.php', 'Проверьте корректность полей.', 'danger');
 }
 
+require_once __DIR__ . '/layout_header.php';
 $cats = $pdo->query("SELECT * FROM shop_categories ORDER BY id DESC")->fetchAll();
 ?>
 
 <h2 class="street-font mb-4">Категории Магазина</h2>
 
 <div class="row">
-    <!-- ФОРМА ДОБАВЛЕНИЯ -->
     <div class="col-md-4">
         <div class="admin-card">
             <div class="admin-header bg-success">Добавить</div>
             <div class="p-3">
                 <form method="POST">
+                    <?= csrfField() ?>
                     <div class="mb-3">
-                        <label class="fw-bold small">Название</label>
-                        <input type="text" name="title" class="form-control" required placeholder="Например: Футболки">
+                        <label for="newShopCatTitle" class="fw-bold small">Название</label>
+                        <input id="newShopCatTitle" type="text" name="title" class="form-control" required placeholder="Например: Баллоны">
                     </div>
-                    <button type="submit" name="add_cat" class="btn btn-admin btn-admin-dark w-100">Добавить</button>
+                    <button type="submit" name="add_cat" value="1" class="btn btn-admin btn-admin-dark w-100">Добавить</button>
                 </form>
             </div>
         </div>
     </div>
-    
-    <!-- СПИСОК -->
+
     <div class="col-md-8">
         <div class="admin-card">
             <div class="admin-header">Список</div>
@@ -101,19 +97,19 @@ $cats = $pdo->query("SELECT * FROM shop_categories ORDER BY id DESC")->fetchAll(
                 <table class="table table-admin m-0">
                     <thead><tr><th>ID</th><th>Название</th><th>Slug (URL)</th><th>Действия</th></tr></thead>
                     <tbody>
-                        <?php foreach($cats as $c): ?>
+                        <?php foreach ($cats as $c):
+                            $fid = 'shopCatForm' . (int)$c['id'];
+                        ?>
                         <tr>
-                            <form method="POST">
-                                <td>#<?= $c['id'] ?><input type="hidden" name="id" value="<?= $c['id'] ?>"></td>
-                                <td><input type="text" name="title" class="form-control form-control-sm" value="<?= htmlspecialchars($c['title']) ?>"></td>
-                                <td class="small text-muted"><?= htmlspecialchars($c['slug']) ?></td>
-                                <td>
-                                    <div class="d-flex gap-1">
-                                        <button type="submit" name="edit_cat" class="btn btn-sm btn-admin btn-admin-dark"><i class="bi bi-save"></i></button>
-                                        <button type="submit" name="delete_cat" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить?')"><i class="bi bi-trash"></i></button>
-                                    </div>
-                                </td>
-                            </form>
+                            <td>#<?= (int)$c['id'] ?></td>
+                            <td><input form="<?= $fid ?>" type="text" name="title" class="form-control form-control-sm" value="<?= e($c['title']) ?>" required aria-label="Название категории"></td>
+                            <td class="small text-muted"><?= e($c['slug']) ?></td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button form="<?= $fid ?>" type="submit" name="edit_cat" value="1" class="btn btn-sm btn-admin btn-admin-dark" title="Сохранить" aria-label="Сохранить"><i class="bi bi-save" aria-hidden="true"></i></button>
+                                    <button form="<?= $fid ?>" type="submit" name="delete_cat" value="1" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить категорию?')" title="Удалить" aria-label="Удалить"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                </div>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -123,4 +119,11 @@ $cats = $pdo->query("SELECT * FROM shop_categories ORDER BY id DESC")->fetchAll(
     </div>
 </div>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php foreach ($cats as $c): ?>
+    <form method="POST" id="shopCatForm<?= (int)$c['id'] ?>" class="d-none">
+        <?= csrfField() ?>
+        <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+    </form>
+<?php endforeach; ?>
+
+<?php require_once __DIR__ . '/layout_footer.php'; ?>

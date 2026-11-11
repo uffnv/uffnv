@@ -1,35 +1,34 @@
 <?php
 // actions/delete_avatar.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: /pages/signin.php");
+checkAuth('/pages/login.php');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: /pages/profile.php");
     exit;
 }
 
-// Получаем текущий аватар
-$stmt = $pdo->prepare("SELECT avatar FROM users WHERE id = ?");
-$stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch();
+requireCsrfOrRedirect('/pages/profile.php');
 
-if ($user && !empty($user['avatar'])) {
-    $filePath = __DIR__ . '/../' . $user['avatar'];
-    
-    // Удаляем физически
-    if (file_exists($filePath)) {
-        unlink($filePath);
+try {
+    $stmt = $pdo->prepare("SELECT avatar FROM users WHERE id = ? LIMIT 1");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch();
+
+    if ($user && !empty($user['avatar'])) {
+        safeUnlinkUpload($user['avatar']);
+
+        $update = $pdo->prepare("UPDATE users SET avatar = NULL WHERE id = ?");
+        $update->execute([$_SESSION['user_id']]);
+        unset($_SESSION['avatar']);
+
+        redirectWithFlash('/pages/profile.php', 'Аватар удален.', 'warning');
     }
-
-    // Удаляем из БД
-    $update = $pdo->prepare("UPDATE users SET avatar = NULL WHERE id = ?");
-    $update->execute([$_SESSION['user_id']]);
-    
-    // Удаляем из сессии
-    unset($_SESSION['avatar']);
-
-    $_SESSION['flash'] = "Аватар удален.";
-    $_SESSION['flash_type'] = "warning";
+} catch (\PDOException $e) {
+    error_log("Delete avatar error: " . $e->getMessage());
 }
 
 header("Location: /pages/profile.php");

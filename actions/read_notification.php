@@ -1,36 +1,34 @@
 <?php
 // actions/read_notification.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
+if (empty($_SESSION['user_id']) || !isset($_GET['id'])) {
     header("Location: /");
     exit;
 }
 
 $notifId = (int)$_GET['id'];
-$userId = $_SESSION['user_id'];
+$userId  = (int)$_SESSION['user_id'];
 
 try {
-    // 1. Получаем ссылку и проверяем владельца
-    $stmt = $pdo->prepare("SELECT link FROM notifications WHERE id = ? AND user_id = ?");
+    $stmt = $pdo->prepare("SELECT link FROM notifications WHERE id = ? AND user_id = ? LIMIT 1");
     $stmt->execute([$notifId, $userId]);
     $notif = $stmt->fetch();
 
     if ($notif) {
-        // 2. Помечаем как прочитанное
-        $update = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ?");
-        $update->execute([$notifId]);
+        $update = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
+        $update->execute([$notifId, $userId]);
 
-        // 3. Переходим по ссылке
         if (!empty($notif['link'])) {
-            header("Location: " . $notif['link']);
+            header("Location: " . safeRedirectUrl($notif['link'], '/pages/notifications.php'));
             exit;
         }
     }
-} catch (Exception $e) {
-    // Тихо падаем
+} catch (\Throwable $e) {
+    error_log("Read notification error: " . $e->getMessage());
 }
 
-// Фолбек
-header("Location: /pages/home.php");
+header("Location: /pages/notifications.php");
+exit;

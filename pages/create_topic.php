@@ -1,17 +1,20 @@
 <?php
 // pages/create_topic.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../includes/header.php';
 
-// Проверка авторизации
-if (!isset($_SESSION['user_id'])) {
-    echo "<script>window.location.href='/pages/login.php';</script>";
-    exit;
+checkAuth('/pages/login.php');
+
+$forumBan = getActiveForumBan($pdo, (int)$_SESSION['user_id'], null);
+if ($forumBan) {
+    $until = $forumBan['expires_at'] ? ' до ' . date('d.m.Y H:i', strtotime($forumBan['expires_at'])) : ' бессрочно';
+    redirectWithFlash('/pages/topics_list.php', 'Доступ к созданию тем ограничен' . $until . '.', 'danger');
 }
 
-// 1. Получаем категории, СГРУППИРОВАННЫЕ по Разделам (для "Обычной темы")
-// Используем LEFT JOIN с таблицей sections, чтобы получить название раздела
+require_once __DIR__ . '/../includes/header.php';
+
+// 1. Получаем категории, СГРУППИРОВАННЫЕ по Разделам
 $sqlCats = "
     SELECT c.id, c.title, c.description, s.title as section_title
     FROM categories c
@@ -21,52 +24,16 @@ $sqlCats = "
 ";
 $rawCats = $pdo->query($sqlCats)->fetchAll();
 
-// Группируем массив для удобного вывода в модалке/селекте
 $groupedCats = [];
 foreach ($rawCats as $cat) {
     $secTitle = $cat['section_title'] ?? 'Без раздела';
     $groupedCats[$secTitle][] = $cat;
 }
-
-// 2. Ищем ID категории "Общее" (или "Флудилка") для второй вкладки
-$genCatStmt = $pdo->prepare("SELECT id, title FROM categories WHERE (title LIKE ? OR title LIKE ? OR title LIKE ?) AND is_approved = 1 LIMIT 1");
-$genCatStmt->execute(['%Общее%', '%Флудилка%', '%General%']);
-$generalCat = $genCatStmt->fetch(PDO::FETCH_ASSOC);
-
-$generalCatId = $generalCat ? $generalCat['id'] : null;
 ?>
 
 <style>
     /* === ОБЩИЙ СТИЛЬ (STREET) === */
     body { font-family: 'Arial', sans-serif; background: #120024; color: #fff; }
-    
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
-
-    /* === ФОН NEON GRID === */
-    .bg-main-anim {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px);
-        background-size: 80px 80px;
-        perspective: 500px;
-        transform-style: preserve-3d;
-        animation: grid-move 6s linear infinite;
-        box-shadow: inset 0 0 150px rgba(0,0,0,0.9); 
-        z-index: -1;
-    }
-    @keyframes grid-move { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
-    .bg-main-anim::after {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 40px 40px;
-    }
 
     /* === КАРТОЧКА ФОРМЫ === */
     .create-card {
@@ -213,18 +180,18 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
                 <!-- 1. ОБЫЧНАЯ ТЕМА (Выбор категории) -->
                 <div class="tab-pane fade show active" id="standard-content">
                     <form action="/actions/create_topic.php" method="POST" id="standardForm">
-                        
+                        <?= csrfField() ?>
                         <div class="card rounded-0 create-card">
                             <div class="card-header bg-black text-white py-3 border-bottom border-3 border-dark">
                                 <span class="street-font fs-5"><i class="bi bi-pencil-square text-warning me-2"></i> Тематическое обсуждение</span>
                             </div>
                             <div class="card-body p-4 p-md-5 bg-white">
-                                
+
                                 <!-- Выбор категории -->
                                 <div class="mb-4">
-                                    <label class="street-font small text-muted mb-2">Раздел форума</label>
+                                    <label for="categorySelectBtn" class="street-font small text-muted mb-2">Раздел форума</label>
                                     <input type="hidden" name="category_id" id="selectedCategoryId">
-                                    
+
                                     <button type="button" class="btn btn-select-cat w-100 rounded-0 py-3 px-3 d-flex justify-content-between align-items-center fw-bold fs-5"
                                             data-bs-toggle="modal" data-bs-target="#categoryModal" id="categorySelectBtn">
                                         <span class="text-muted"><i class="bi bi-grid me-2"></i> Выберите раздел...</span>
@@ -233,13 +200,13 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
                                 </div>
 
                                 <div class="mb-4">
-                                    <label class="street-font small text-muted mb-2">Заголовок</label>
-                                    <input type="text" name="title" class="form-control form-control-lg rounded-0" placeholder="О чем речь?" required>
+                                    <label for="topicTitleInput" class="street-font small text-muted mb-2">Заголовок</label>
+                                    <input type="text" id="topicTitleInput" name="title" class="form-control form-control-lg rounded-0" placeholder="О чем речь?" maxlength="200" required>
                                 </div>
 
                                 <div class="mb-5">
-                                    <label class="street-font small text-muted mb-2">Суть вопроса</label>
-                                    <textarea name="content" class="form-control rounded-0" rows="6" placeholder="Распиши подробно..." required></textarea>
+                                    <label for="topicContentInput" class="street-font small text-muted mb-2">Суть вопроса</label>
+                                    <textarea id="topicContentInput" name="content" class="form-control rounded-0" rows="6" placeholder="Распиши подробно..." required></textarea>
                                 </div>
 
                                 <button type="submit" class="btn btn-black w-100 rounded-0 text-uppercase py-3 fs-4 shadow-sm">
@@ -253,6 +220,7 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
                 <!-- 3. ЗАЯВКА НА РАЗДЕЛ -->
                 <div class="tab-pane fade" id="new-cat-content">
                     <form action="/actions/create_category.php" method="POST" id="newCatForm">
+                        <?= csrfField() ?>
                         <div class="card rounded-0 create-card">
                             <div class="card-header bg-danger text-white border-bottom border-3 border-dark py-3">
                                 <span class="street-font fs-5"><i class="bi bi-plus-circle-fill me-2 text-warning"></i> Новый раздел</span>
@@ -262,12 +230,12 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
                                     <i class="bi bi-shield-lock-fill me-2"></i> Раздел появится после одобрения администратором.
                                 </div>
                                 <div class="mb-4">
-                                    <label class="street-font small text-muted mb-2">Название раздела</label>
-                                    <input type="text" name="title" class="form-control form-control-lg rounded-0" required>
+                                    <label for="newCatTitleInput" class="street-font small text-muted mb-2">Название раздела</label>
+                                    <input type="text" id="newCatTitleInput" name="title" class="form-control form-control-lg rounded-0" maxlength="100" required>
                                 </div>
                                 <div class="mb-5">
-                                    <label class="street-font small text-muted mb-2">Описание</label>
-                                    <textarea name="description" class="form-control rounded-0" rows="4" placeholder="Для чего этот раздел?" required></textarea>
+                                    <label for="newCatDescInput" class="street-font small text-muted mb-2">Описание</label>
+                                    <textarea id="newCatDescInput" name="description" class="form-control rounded-0" rows="4" placeholder="Для чего этот раздел?" required></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-black w-100 rounded-0 text-uppercase py-3 fs-4 shadow-sm text-warning">
                                     ОТПРАВИТЬ ЗАЯВКУ
@@ -288,29 +256,30 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
         <div class="modal-content rounded-0">
             <div class="modal-header bg-black text-white rounded-0 py-3 border-bottom border-3 border-dark">
                 <h5 class="modal-title street-font">Выберите раздел</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-header bg-light border-bottom border-3 border-dark p-3">
-                <input type="text" id="catSearchInput" class="form-control rounded-0 border-2 border-dark fw-bold" placeholder="🔍 Поиск...">
+                <input type="text" id="catSearchInput" class="form-control rounded-0 border-2 border-dark fw-bold" placeholder="Поиск раздела..." aria-label="Поиск раздела">
             </div>
             <div class="modal-body p-0 bg-white">
                 <div class="list-group list-group-flush" id="categoriesList" style="max-height: 400px; overflow-y: auto;">
                     <?php if (empty($groupedCats)): ?>
                         <div class="p-4 text-center text-muted fw-bold">Нет доступных категорий</div>
                     <?php else: ?>
-                        <?php foreach($groupedCats as $sectionName => $cats): ?>
-                            <!-- ЗАГОЛОВОК РАЗДЕЛА (ГРУППИРОВКА) -->
+                        <?php foreach ($groupedCats as $sectionName => $cats): ?>
                             <div class="section-header">
-                                <?= htmlspecialchars($sectionName) ?>
+                                <?= e($sectionName) ?>
                             </div>
-                            
-                            <?php foreach($cats as $c): ?>
-                                <button type="button" class="list-group-item list-group-item-action p-4 border-bottom cat-item-btn" 
-                                        onclick="selectCategory(<?= $c['id'] ?>, '<?= htmlspecialchars($c['title']) ?>')">
+
+                            <?php foreach ($cats as $c): ?>
+                                <button type="button"
+                                        class="list-group-item list-group-item-action p-4 border-bottom cat-item-btn"
+                                        data-cat-id="<?= (int)$c['id'] ?>"
+                                        data-cat-title="<?= e($c['title']) ?>">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h5 class="street-font mb-1 text-dark"><?= htmlspecialchars($c['title']) ?></h5>
-                                            <small class="text-muted fw-bold"><?= htmlspecialchars($c['description']) ?></small>
+                                            <h5 class="street-font mb-1 text-dark"><?= e($c['title']) ?></h5>
+                                            <small class="text-muted fw-bold"><?= e($c['description']) ?></small>
                                         </div>
                                         <i class="bi bi-chevron-right fs-4 opacity-50"></i>
                                     </div>
@@ -325,38 +294,49 @@ $generalCatId = $generalCat ? $generalCat['id'] : null;
 </div>
 
 <script>
-// Выбор категории
-function selectCategory(id, title) {
-    document.getElementById('selectedCategoryId').value = id;
-    const btn = document.getElementById('categorySelectBtn');
-    
-    // Меняем стиль кнопки на "Выбрано"
-    btn.innerHTML = `<span class="text-dark"><i class="bi bi-check-circle-fill me-2 text-success"></i> ${title}</span> <span class="badge bg-black text-warning rounded-0 border border-dark">Изменить</span>`;
-    btn.classList.add('selected');
-    
-    // Закрываем модалку
-    const modalEl = document.getElementById('categoryModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    modal.hide();
-}
+document.querySelectorAll('.cat-item-btn').forEach(item => {
+    item.addEventListener('click', function() {
+        const id = this.dataset.catId || '';
+        const title = this.dataset.catTitle || '';
+        document.getElementById('selectedCategoryId').value = id;
 
-// Поиск по категориям
-document.getElementById('catSearchInput').addEventListener('input', function() {
-    const filter = this.value.toLowerCase();
-    // Ищем только элементы с классом cat-item-btn
-    document.querySelectorAll('.cat-item-btn').forEach(item => { 
-        item.classList.toggle('d-none', !item.innerText.toLowerCase().includes(filter)); 
+        const btn = document.getElementById('categorySelectBtn');
+        btn.replaceChildren();
+
+        const leftSpan = document.createElement('span');
+        leftSpan.className = 'text-dark';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-check-circle-fill me-2 text-success';
+        leftSpan.appendChild(icon);
+        leftSpan.appendChild(document.createTextNode(title));
+
+        const rightBadge = document.createElement('span');
+        rightBadge.className = 'badge bg-black text-warning rounded-0 border border-dark';
+        rightBadge.textContent = 'Изменить';
+
+        btn.appendChild(leftSpan);
+        btn.appendChild(rightBadge);
+        btn.classList.add('selected');
+
+        const modalEl = document.getElementById('categoryModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
     });
-    // Можно добавить логику скрытия пустых section-header, но пока оставим как есть для простоты
 });
 
-// Валидация перед отправкой формы "Обычная тема"
+document.getElementById('catSearchInput').addEventListener('input', function() {
+    const filter = this.value.toLowerCase();
+    document.querySelectorAll('.cat-item-btn').forEach(item => {
+        item.classList.toggle('d-none', !item.innerText.toLowerCase().includes(filter));
+    });
+});
+
 const standardForm = document.getElementById('standardForm');
 if (standardForm) {
     standardForm.addEventListener('submit', function(e) {
         const catId = document.getElementById('selectedCategoryId').value;
         if (!catId) {
-            e.preventDefault(); 
+            e.preventDefault();
             alert('Пожалуйста, выберите раздел для темы!');
             new bootstrap.Modal(document.getElementById('categoryModal')).show();
         }

@@ -1,114 +1,85 @@
 <?php
 // actions/delete_profile.php
-session_start();
+require_once __DIR__ . '/../includes/functions.php';
+initAppSession();
 require_once __DIR__ . '/../config/db.php';
 
-// 1. Проверка авторизации
-if (!isset($_SESSION['user_id'])) {
-    header("Location: /pages/signin.php");
+checkAuth('/pages/login.php');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: /pages/profile.php");
     exit;
 }
 
-$currentUserId = $_SESSION['user_id'];
+$currentUserId = (int)$_SESSION['user_id'];
 $currentUserRole = $_SESSION['role'] ?? 'user';
 
-// Определяем, кого и как удаляем
 $targetId = 0;
 $isSelfDelete = false;
 
 if (isset($_POST['action']) && $_POST['action'] === 'self_delete') {
-    // Пользователь удаляет сам себя
     $targetId = $currentUserId;
     $isSelfDelete = true;
+    requireCsrfOrRedirect('/pages/profile.php');
 } elseif (isset($_POST['user_id'])) {
-    // Админ удаляет кого-то другого
     $targetId = (int)$_POST['user_id'];
+    requireCsrfOrRedirect('/admin/users.php');
 } else {
-    die("Неверный запрос.");
+    redirectWithFlash('/pages/profile.php', 'Неверный запрос.', 'danger');
 }
 
-// 2. Логика прав и проверок
 if ($isSelfDelete) {
-    // --- УДАЛЕНИЕ СЕБЯ (Нужен пароль) ---
     $password = $_POST['password'] ?? '';
-    
-    // Получаем хеш пароля из БД
-    $stmt = $pdo->prepare("SELECT password_hash, role FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT password_hash, role, avatar FROM users WHERE id = ? LIMIT 1");
     $stmt->execute([$currentUserId]);
-    $user = $stmt->fetch();
+    $targetUser = $stmt->fetch();
 
-    if (!$user) {
-        die("Пользователь не найден.");
+    if (!$targetUser) {
+        redirectWithFlash('/pages/login.php', 'Пользователь не найден.', 'danger');
     }
-    
-    // Защита от удаления Супер-Админа (даже самим собой - от греха подальше)
-    if ($user['role'] === 'super_admin') {
-        echo "<script>alert('Супер-админ не может самоуничтожиться!'); window.location.href='/pages/profile.php';</script>";
-        exit;
+    if ($targetUser['role'] === 'super_admin') {
+        redirectWithFlash('/pages/profile.php', 'Супер-админ не может удалить свой аккаунт таким способом.', 'danger');
     }
-
-    // Проверяем пароль
-    if (!password_verify($password, $user['password_hash'])) {
-        echo "<script>alert('Неверный пароль!'); window.location.href='/pages/profile.php';</script>";
-        exit;
+    if (!password_verify($password, $targetUser['password_hash'])) {
+        redirectWithFlash('/pages/profile.php', 'Неверный пароль! Аккаунт не удален.', 'danger');
     }
-
 } else {
-    // --- УДАЛЕНИЕ АДМИНОМ (Пароль не нужен, нужны права) ---
-    if ($currentUserRole !== 'admin' && $currentUserRole !== 'super_admin') {
-        die("У вас нет прав администратора.");
+    if (!isAdmin()) {
+        redirectWithFlash('/', 'У вас нет прав администратора.', 'danger');
+    }
+    if ($targetId === $currentUserId) {
+        redirectWithFlash('/admin/users.php', 'Используйте удаление профиля в личном кабинете.', 'warning');
     }
 
-    // Проверяем цель
-    $stmt = $pdo->prepare("SELECT role, avatar FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT role, avatar FROM users WHERE id = ? LIMIT 1");
     $stmt->execute([$targetId]);
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        die("Цель не найдена.");
+        redirectWithFlash('/admin/users.php', 'Пользователь не найден.', 'danger');
     }
-
-    // Нельзя удалить Супер-Админа
-    if ($targetUser['role'] === 'super_admin') {
-        echo "<script>alert('Нельзя удалить Супер-Админа!'); window.location.href='/admin/users.php';</script>";
-        exit;
-    }
-    
-    // Админ не может удалить самого себя через эту кнопку (для этого есть self_delete)
-    if ($targetId === $currentUserId) {
-         echo "<script>alert('Используйте удаление профиля в личном кабинете.'); window.location.href='/admin/users.php';</script>";
-         exit;
+    if (!canManageTargetUser($currentUserRole, $targetUser['role'])) {
+        redirectWithFlash('/admin/users.php', 'Недостаточно прав для удаления этого пользователя.', 'danger');
     }
 }
 
-// 3. ПРОЦЕСС УДАЛЕНИЯ
 try {
-    // Получаем данные для удаления аватарки (если мы еще не получили их выше)
-    if (!isset($targetUser)) {
-        $stmt = $pdo->prepare("SELECT avatar FROM users WHERE id = ?");
-        $stmt->execute([$targetId]);
-        $targetUser = $stmt->fetch();
+    if (!empty($targetUser['avatar'])) {
+        safeUnlinkUpload($targetUser['avatar']);
     }
 
-    // Удаляем файл аватарки
-    if (!empty($targetUser['avatar']) && file_exists(__DIR__ . '/../' . $targetUser['avatar'])) {
-        unlink(__DIR__ . '/../' . $targetUser['avatar']);
-    }
-
-    // Удаляем из БД
     $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$targetId]);
 
-    // 4. Финиш
     if ($isSelfDelete) {
-        // Если удалил себя -> Выход
+        $_SESSION = [];
         session_destroy();
         header("Location: /");
-    } else {
-        // Если удалил админ -> Обратно в админку
-        header("Location: /admin/users.php");
+        exit;
     }
-    exit;
 
-} catch (PDOException $e) {
-    die("Ошибка БД: " . $e->getMessage());
+    redirectWithFlash('/admin/users.php', 'Пользователь успешно удален.', 'success');
+} catch (\PDOException $e) {
+    error_log("Delete profile error: " . $e->getMessage());
+    $back = $isSelfDelete ? '/pages/profile.php' : '/admin/users.php';
+    redirectWithFlash($back, 'Ошибка базы данных при удалении профиля.', 'danger');
 }
