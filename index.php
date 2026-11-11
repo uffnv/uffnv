@@ -36,40 +36,61 @@ try {
     }
     .header-hidden { transform: translateY(-100%); }
 
-    /* === 2. ОБЩИЕ СТИЛИ (ОРИГИНАЛ + АДАПТАЦИЯ) === */
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Arial', sans-serif; overflow-x: hidden; background: #000; margin: 0; padding: 0; }
-
-    /* Секции на весь экран с поддержкой мобильных */
+    /* === 2. ОБЩИЕ СТИЛИ (АДАПТИВНЫЕ ПРОПОРЦИИ) === */
+    /* Секции на весь экран с поддержкой мобильных и учётом хедера */
     .full-screen-section { 
         position: relative; 
         width: 100%; 
-        min-height: 100vh;
-        min-height: 100dvh; /* Фикс для мобильных браузеров */
+        min-height: clamp(540px, 84vh, 820px);
+        min-height: clamp(540px, 84svh, 820px);
         display: flex; 
         align-items: center; 
         justify-content: center; 
         overflow: hidden; 
-        padding: 0; 
+        padding: 60px 0 80px; 
+    }
+    #section-hero {
+        min-height: calc(100vh - var(--header-height, 74px));
+        min-height: calc(100svh - var(--header-height, 74px));
+        padding: 36px 0 84px;
+    }
+    .hero-mega-title {
+        font-size: clamp(2.75rem, 7.2vw, 5.1rem);
+        line-height: 0.94;
+        letter-spacing: 2px;
+        text-shadow: 4px 4px 0 #bc13fe;
+    }
+    .hero-tagline {
+        border: 4px solid #000;
+        transform: rotate(-1.5deg);
+        box-shadow: 6px 6px 0 #bc13fe;
+        font-size: clamp(0.95rem, 2.1vw, 1.45rem);
+    }
+    .hero-meta-strip {
+        font-family: monospace;
+        font-size: 0.8rem;
+        letter-spacing: 2.5px;
+        color: rgba(255, 255, 255, 0.72);
     }
     
     /* Навигация (кнопка вниз) */
-    .scroll-down-btn-container { position: absolute; bottom: 30px; left: 0; width: 100%; text-align: center; z-index: 20; pointer-events: none; }
-    .scroll-btn { pointer-events: auto; background: none; border: none; color: rgba(255, 255, 255, 0.7); font-size: 2.5rem; transition: all 0.3s ease; cursor: pointer; padding: 10px; }
-    .scroll-btn:hover { color: #FCE300 !important; transform: translateY(-5px); text-shadow: 0 0 15px rgba(252, 227, 0, 0.8); }
+    .scroll-down-btn-container { position: absolute; bottom: 18px; left: 0; width: 100%; text-align: center; z-index: 20; pointer-events: none; }
+    .scroll-btn { pointer-events: auto; background: none; border: none; color: rgba(255, 255, 255, 0.78); font-size: 2.2rem; line-height: 1; transition: all 0.3s ease; cursor: pointer; padding: 8px 14px; }
+    .scroll-btn:hover { color: #FCE300 !important; transform: translateY(-4px); text-shadow: 0 0 15px rgba(252, 227, 0, 0.8); }
 
-    /* Типографика и кнопки */
-    .street-font { font-family: 'Arial Black', 'Impact', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-    
-    .btn-street { background-color: #FCE300; color: #000 !important; border: 4px solid #000; font-family: 'Arial Black', 'Impact', sans-serif; font-weight: 900; text-transform: uppercase; padding: 15px 30px; font-size: 1.2rem; box-shadow: 6px 6px 0px #000; text-decoration: none; display: inline-block; transition: all 0.2s; cursor: pointer; }
+    /* Кнопки главной */
+    .btn-street { background-color: #FCE300; color: #000 !important; border: 4px solid #000; font-family: 'Arial Black', 'Impact', sans-serif; font-weight: 900; text-transform: uppercase; padding: 14px 28px; font-size: 1.05rem; box-shadow: 6px 6px 0px #000; text-decoration: none; display: inline-block; transition: all 0.2s; cursor: pointer; }
     .btn-street:hover { background-color: #fff; transform: translate(-3px, -3px); box-shadow: 10px 10px 0px #000; }
     .btn-street-sm { padding: 10px 20px; font-size: 1rem; box-shadow: 4px 4px 0px #000; width: 100%; }
+    .btn-street-outline { background-color: rgba(18, 0, 36, 0.82); color: #fff !important; border: 4px solid #fff; font-family: 'Arial Black', 'Impact', sans-serif; font-weight: 900; text-transform: uppercase; padding: 14px 28px; font-size: 1.05rem; box-shadow: 6px 6px 0px #bc13fe; text-decoration: none; display: inline-block; transition: all 0.2s; cursor: pointer; }
+    .btn-street-outline:hover { background-color: #bc13fe; border-color: #000; color: #fff !important; transform: translate(-3px, -3px); box-shadow: 10px 10px 0px #000; }
 
     /* Фоны */
     .section-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    .section-content { position: relative; z-index: 10; width: 100%; padding-bottom: 60px; }
+    .section-content { position: relative; z-index: 10; width: 100%; }
 
-    .bg-main-anim { background: #120024; background-image: linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px); background-size: 80px 80px; animation: gridMove 6s linear infinite; box-shadow: inset 0 0 150px rgba(0,0,0,0.9); }
+    .section-bg.bg-main-anim { position: absolute; inset: 0; min-height: 0; z-index: 1; background: #120024; background-image: linear-gradient(rgba(188, 19, 254, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(188, 19, 254, 0.3) 1px, transparent 1px); background-size: 80px 80px; animation: gridMove 6s linear infinite; box-shadow: inset 0 0 150px rgba(0,0,0,0.9); }
+    .section-bg.bg-main-anim::after { display: none; }
     @keyframes gridMove { 0% { background-position: 0 0; } 100% { background-position: 0 80px; } }
 
     .bg-graffiti-brick { 
@@ -82,7 +103,7 @@ try {
     .street-tape { position: absolute; width: 120%; height: 60px; background: repeating-linear-gradient(45deg, #fce300, #fce300 20px, #000 20px, #000 40px); top: 20%; left: -10%; transform: rotate(-5deg); opacity: 0.8; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 1; }
     .wall-noise { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJnIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC41IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjEiLz48L3N2Zz4='); opacity: 0.4; z-index: 3; pointer-events: none; }
     
-    .card-placeholder-graffiti { width: 100%; height: 350px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; border: 4px solid #fce300; box-shadow: 10px 10px 0 #000; background: repeating-linear-gradient(45deg, #1a1a1a, #1a1a1a 10px, #222 10px, #222 20px); }
+    .card-placeholder-graffiti { width: 100%; height: clamp(220px, 34vh, 330px); background: #1a1a1a; display: flex; align-items: center; justify-content: center; border: 4px solid #fce300; box-shadow: 10px 10px 0 #000; background: repeating-linear-gradient(45deg, #1a1a1a, #1a1a1a 10px, #222 10px, #222 20px); }
 
     .bg-cyber-animated {
         background-color: #000;
@@ -118,39 +139,28 @@ try {
     .btn-cyber:hover { background: cyan; color: #000 !important; box-shadow: 0 0 50px cyan; }
     .text-glow { text-shadow: 0 0 10px cyan; }
 
-    .card-placeholder-retro { width: 100%; height: 350px; background: #120024; display: flex; align-items: center; justify-content: center; border: 4px solid #bc13fe; box-shadow: -10px 10px 0 #fff; }
+    .card-placeholder-retro { width: 100%; height: clamp(220px, 34vh, 330px); background: #120024; display: flex; align-items: center; justify-content: center; border: 4px solid #bc13fe; box-shadow: -10px 10px 0 #fff; }
     .bg-industrial-yellow { background-color: #FCE300; background-image: repeating-linear-gradient(45deg, #FCE300, #FCE300 10px, #e6cf00 10px, #e6cf00 20px); border-top: 5px solid #000; }
-    .manifest-box-dark { background: #000; color: #fff; border: 4px solid #fff; box-shadow: 15px 15px 0px rgba(0,0,0,0.2); padding: 50px; transform: rotate(-1deg); position: relative; }
-    .anim-icon { font-size: 6rem; animation: bounce 2s infinite; }
+    .manifest-box-dark { background: #000; color: #fff; border: 4px solid #fff; box-shadow: 15px 15px 0px rgba(0,0,0,0.2); padding: clamp(24px, 4vw, 44px); transform: rotate(-1deg); position: relative; }
+    .anim-icon { font-size: clamp(3.5rem, 6vw, 5.5rem); animation: bounce 2s infinite; }
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     #matrixCanvas { width: 100%; height: 100%; background: #000; }
     .overlay-dark { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1; }
 
     /* === 3. МОБИЛЬНАЯ АДАПТАЦИЯ (COMPACT MODE) === */
     @media (max-width: 768px) {
-        /* Уменьшаем шрифты, чтобы влезало */
-        .mega-title { font-size: 3.5rem !important; margin-bottom: 0.5rem !important; }
-        .display-2 { font-size: 2rem !important; }
-        .display-3 { font-size: 1.8rem !important; }
-        
-        /* Сжимаем отступы */
-        .full-screen-section { padding: 40px 15px !important; }
-        .section-content { padding-bottom: 20px !important; }
-        
-        /* Уменьшаем блоки, но НЕ СКРЫВАЕМ их */
-        .card-placeholder-graffiti, .card-placeholder-retro { height: 200px !important; margin-top: 15px; }
-        
-        /* Инфо-боксы: меньше паддинги */
-        .info-box, .cyber-card-glitch, .manifest-box-dark { padding: 20px !important; }
-        
-        /* Ленту делаем тоньше и выше, но оставляем */
+        .mega-title { font-size: clamp(2.35rem, 11vw, 3.4rem) !important; margin-bottom: 0.75rem !important; }
+        .display-2 { font-size: 1.95rem !important; }
+        .display-3 { font-size: 1.7rem !important; }
+
+        .full-screen-section { min-height: auto; padding: 48px 12px 68px !important; }
+        #section-hero { min-height: calc(100svh - var(--header-height, 74px)); padding: 28px 12px 64px !important; }
+
+        .card-placeholder-graffiti, .card-placeholder-retro { height: 200px !important; margin-top: 10px; }
+        .info-box, .cyber-card-glitch, .manifest-box-dark { padding: 22px !important; transform: none !important; }
         .street-tape { height: 30px; top: 10%; }
-        
-        /* Значки и бейджи масштабируем */
         .badge { font-size: 0.7rem !important; padding: 0.3em 0.6em; }
-        .anim-icon { font-size: 3rem !important; }
-        
-        /* Кнопка скролла чуть меньше */
+        .btn-street, .btn-street-outline { width: 100%; padding: 12px 20px; font-size: 1rem; }
         .scroll-btn { font-size: 1.8rem; }
         .scroll-down-btn-container { bottom: 10px; }
     }
@@ -159,17 +169,23 @@ try {
 <div id="section-hero" class="full-screen-section">
     <div class="section-bg bg-main-anim"></div>
     <div class="section-content container text-center">
-        <h1 class="street-font text-white mb-4 mega-title" style="font-size: 6rem; line-height: 0.9; text-shadow: 4px 4px 0 #bc13fe;" data-aos="zoom-in">
+        <div class="hero-meta-strip text-uppercase mb-3 fw-bold" data-aos="fade-down">
+            [ STREETWEAR // COMMUNITY // UNDERGROUND ]
+        </div>
+        <h1 class="street-font text-white mb-4 mega-title hero-mega-title" data-aos="zoom-in">
             STREET<br>CULTURE<br>FORUM
         </h1>
-        <div class="d-inline-block bg-warning text-black px-4 py-3 px-md-5 py-md-4 fs-5 fs-md-3 street-font border-3 border-dark" 
-             style="border: 4px solid #000; transform: rotate(-2deg); box-shadow: 6px 6px 0 #bc13fe;"
-             data-aos="fade-up" data-aos-delay="300">
+        <div class="d-inline-block bg-warning text-black px-4 py-2 px-md-5 py-md-3 street-font hero-tagline mb-4"
+             data-aos="fade-up" data-aos-delay="200">
             ТВОЙ ГОЛОС В ШУМЕ ГОРОДА
+        </div>
+        <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3 mt-2" data-aos="fade-up" data-aos-delay="350">
+            <a href="/pages/catalog.php" class="btn-street">КАТАЛОГ ДРОПОВ <i class="bi bi-bag-fill ms-1" aria-hidden="true"></i></a>
+            <a href="/pages/topics_list.php" class="btn-street-outline">ОТКРЫТЬ ФОРУМ <i class="bi bi-chat-square-text-fill ms-1" aria-hidden="true"></i></a>
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-graffiti')" class="scroll-btn"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" onclick="smoothScroll('section-graffiti')" class="scroll-btn" aria-label="Перейти к следующему разделу"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
     </div>
 </div>
 
@@ -209,7 +225,7 @@ try {
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-retro')" class="scroll-btn"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" onclick="smoothScroll('section-retro')" class="scroll-btn" aria-label="К разделу Geek Culture"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
     </div>
 </div>
 
@@ -243,7 +259,7 @@ try {
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-forum')" class="scroll-btn"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" onclick="smoothScroll('section-forum')" class="scroll-btn" aria-label="К горячим обсуждениям"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
     </div>
 </div>
 
@@ -286,7 +302,7 @@ try {
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-manifest')" class="scroll-btn"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" onclick="smoothScroll('section-manifest')" class="scroll-btn" aria-label="К нашему манифесту"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
     </div>
 </div>
 
@@ -324,7 +340,7 @@ try {
         </div>
     </div>
     <div class="scroll-down-btn-container">
-        <button onclick="smoothScroll('section-ai')" class="scroll-btn" style="color: #000 !important;"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" onclick="smoothScroll('section-ai')" class="scroll-btn" style="color: #000 !important;" aria-label="К разделу Neural_Net"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
     </div>
 </div>
 

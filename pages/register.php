@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // pages/register.php
 require_once __DIR__ . '/../includes/functions.php';
 initAppSession();
@@ -21,11 +21,11 @@ require_once __DIR__ . '/../includes/header.php';
 
     /* === AUTH CARD === */
     .auth-container {
-        min-height: 85vh;
+        min-height: calc(100dvh - 150px);
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px;
+        padding: 36px 16px;
         position: relative; z-index: 2;
     }
     .auth-card {
@@ -37,16 +37,18 @@ require_once __DIR__ . '/../includes/header.php';
         position: relative;
     }
     .auth-header {
-        background: #fff;
-        color: #fff;
-        padding-top: 30px;
+        background: #000;
+        color: #FCE300;
+        border-bottom: 4px solid #000;
+        padding: 32px 20px 20px;
         text-align: center;
-        font-family: 'Arial Black', sans-serif;
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 2px;
-        font-size: 1.5rem;
+        font-size: 1.55rem;
     }
-    .auth-header span { color: #FCE300; text-shadow: 2px 2px 0 #bc13fe; }
+    .auth-header span { color: #FCE300; text-shadow: 3px 3px 0 #bc13fe; }
     
     .street-label {
         font-weight: 900;

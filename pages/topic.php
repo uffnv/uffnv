@@ -71,7 +71,7 @@ if ((int)$topic['is_approved'] === 0) {
     if (!isAdmin() && !$isAuthor) {
         $pageTitle = 'Тема на модерации';
         require_once __DIR__ . '/../includes/header.php';
-        echo '<div class="bg-main-anim py-5"><div class="container py-5"><div class="alert alert-danger border-4 border-dark rounded-0 fw-bold text-center text-uppercase">ДОСТУП ЗАПРЕЩЕН: ТЕМА НА МОДЕРАЦИИ</div></div></div>';
+        echo '<div class="bg-main-anim"></div><div class="py-5 position-relative" style="z-index: 2;"><div class="container py-5"><div class="alert alert-danger border-4 border-dark rounded-0 fw-bold text-center text-uppercase">ДОСТУП ЗАПРЕЩЕН: ТЕМА НА МОДЕРАЦИИ</div></div></div>';
         require_once __DIR__ . '/../includes/footer.php';
         exit;
     }
@@ -131,8 +131,10 @@ require_once __DIR__ . '/../includes/header.php';
     .hover-opacity:hover { opacity: 0.7; color: #FCE300 !important; }
 </style>
 
-<div class="bg-main-anim py-5">
-    <div class="container" style="position: relative; z-index: 2;">
+<div class="bg-main-anim"></div>
+
+<div class="py-5 position-relative" style="z-index: 2;">
+    <div class="container">
 
         <?php if (!empty($_SESSION['flash'])): ?>
             <div class="alert alert-<?= e($_SESSION['flash_type'] ?? 'info') ?> border-3 border-dark rounded-0 fw-bold mb-4">

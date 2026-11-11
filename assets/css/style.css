@@ -3,43 +3,95 @@
 :root {
     --street-yellow: #FCE300;
     --street-pink: #ff007f;
+    --street-purple: #bc13fe;
     --street-dark: #121212;
     --street-purple-bg: #120024;
     --street-black: #000000;
     --street-border: 3px solid #000000;
+    --header-height: 74px;
+}
+
+html {
+    scroll-behavior: smooth;
+    overflow-x: clip;
 }
 
 body {
     font-family: 'Arial', sans-serif;
-    overflow-x: hidden;
+    overflow-x: clip;
     background: var(--street-purple-bg);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-/* ФОНОВАЯ НЕОНОВАЯ СЕТКА ДЛЯ СТРАНИЦ */
+/* ФОНОВАЯ НЕОНОВАЯ СЕТКА ДЛЯ СТРАНИЦ (фиксированный слой под контентом) */
 .bg-main-anim {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     background-color: var(--street-purple-bg);
     background-image:
-        linear-gradient(rgba(255, 0, 127, 0.25) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 0, 127, 0.25) 1px, transparent 1px);
-    background-size: 60px 60px;
+        linear-gradient(rgba(188, 19, 254, 0.25) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(188, 19, 254, 0.25) 1px, transparent 1px);
+    background-size: 64px 64px;
     background-position: 0 0;
-    min-height: 100vh;
-    position: relative;
-    overflow-x: hidden;
+    box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.85);
+    z-index: -1;
+    pointer-events: none;
     animation: bgGridMove 10s linear infinite;
+}
+
+.bg-main-anim::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
 }
 
 @keyframes bgGridMove {
     0% { background-position: 0 0; }
-    100% { background-position: 60px 60px; }
+    100% { background-position: 64px 64px; }
+}
+
+/* БАЗОВАЯ ТИПОГРАФИКА И КНОПКИ STREET ART */
+.street-font {
+    font-family: 'Arial Black', 'Impact', sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.text-street-yellow {
+    color: var(--street-yellow) !important;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.btn-black {
+    background: #000;
+    color: var(--street-yellow);
+    border: 2px solid #000;
+    font-family: 'Arial Black', 'Impact', sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    transition: all 0.2s;
+}
+.btn-black:hover {
+    background: var(--street-yellow);
+    color: #000;
+    border-color: #000;
 }
 
 /* АНИМАЦИЯ ПОЯВЛЕНИЯ */
 @keyframes fadeInDown {
-    from { opacity: 0; transform: translateY(-20px); }
+    from { opacity: 0.92; transform: translateY(-6px); }
     to { opacity: 1; transform: translateY(0); }
 }
-.fade-in-down { animation: fadeInDown 0.6s ease-out forwards; }
+.fade-in-down { animation: fadeInDown 0.22s ease-out forwards; }
 
 /* ХЕДЕР */
 .street-header {
@@ -64,7 +116,8 @@ body {
     border: 2px solid var(--street-yellow);
     box-shadow: 0 0 10px rgba(252, 227, 0, 0.2);
     transition: transform 0.2s;
-    margin-right: 2rem;
+    margin-right: 1.25rem;
+    flex-shrink: 0;
 }
 .header-logo-sticker:hover {
     transform: rotate(0deg) scale(1.05);
@@ -265,6 +318,13 @@ body {
 @media (min-width: 768px) {
     .border-end-md { border-right: 2px solid #000 !important; }
 }
+@media (min-width: 992px) {
+    .border-lg-start-0 { border-left: 0 !important; }
+}
+
+@media (min-width: 768px) {
+    .border-end-md { border-right: 2px solid #000 !important; }
+}
 
 .btn-black {
     background-color: #000;
@@ -333,6 +393,7 @@ body {
     border-top: 5px solid var(--street-yellow);
     padding-top: 60px;
     padding-bottom: 40px;
+    margin-top: auto;
     position: relative;
     z-index: 10;
 }
@@ -450,6 +511,8 @@ body {
     color: #666;
     text-transform: uppercase;
     letter-spacing: 1px;
+    position: relative;
+    z-index: 10;
 }
 .street-cookie-banner {
     position: fixed;

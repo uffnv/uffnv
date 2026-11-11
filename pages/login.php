@@ -100,13 +100,13 @@ require_once __DIR__ . '/../includes/header.php';
 <!-- ФОН -->
 <div class="bg-main-anim"></div>
 
-<div class="container py-5" style="min-height: 80vh; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2;">
+<div class="container py-4 py-md-5" style="min-height: calc(100dvh - 150px); display: flex; align-items: center; justify-content: center; position: relative; z-index: 2;">
     
-    <div class="login-card p-5 position-relative w-100">
+    <div class="login-card p-4 p-md-5 position-relative w-100">
         <!-- Скотч -->
         <div class="tape-strip"></div>
 
-        <div class="text-center mb-5 mt-2">
+        <div class="text-center mb-4 mt-2">
             <h1 class="display-4 street-font m-0 text-dark">ВХОД</h1>
             <p class="text-muted fw-bold text-uppercase mt-2 street-font" style="letter-spacing: 1px;">
                 Welcome Back

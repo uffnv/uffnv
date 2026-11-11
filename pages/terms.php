@@ -19,12 +19,12 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="bg-main-anim"></div>
 
-<div class="container py-5 my-4">
+<div class="container py-4 py-md-5 position-relative" style="z-index: 2;">
     <div class="row justify-content-center">
         <div class="col-lg-10">
             
             <div class="info-card">
-                <div class="d-flex align-items-center gap-3 mb-4 border-bottom border-dark border-3 pb-3">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-4 border-bottom border-dark border-3 pb-3">
                     <span class="badge bg-black text-warning rounded-0 px-3 py-2 street-font fs-6">ЗоЗПП РФ</span>
                     <h1 class="street-font fs-2 m-0 text-dark">Публичная оферта и Пользовательское соглашение</h1>
                 </div>

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // pages/checkout.php
 require_once __DIR__ . '/../includes/functions.php';
 initAppSession();
