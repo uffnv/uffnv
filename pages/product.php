@@ -137,7 +137,7 @@ if (!empty($product['cat_id'])) {
     
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb fw-bold text-uppercase small">
-            <li class="breadcrumb-item"><a href="/index.php">Главная</a></li>
+            <li class="breadcrumb-item"><a href="/">Главная</a></li>
             <li class="breadcrumb-item"><a href="/pages/catalog.php">Каталог</a></li>
             <li class="breadcrumb-item active text-break"><?= e($product['title']) ?></li>
         </ol>
@@ -162,6 +162,7 @@ if (!empty($product['cat_id'])) {
                 </div>
 
                 <!-- Главное фото -->
+                <?php $mainImg = safeUrl($product['image'] ?? '', ''); ?>
                 <div class="flex-grow-1 main-image-box order-1 order-md-2" id="mainImageContainer">
                     <div class="position-absolute top-0 start-0 p-3 pe-none" style="z-index: 10;">
                         <?php if ($product['is_new']): ?>
@@ -172,7 +173,13 @@ if (!empty($product['cat_id'])) {
                         <?php endif; ?>
                     </div>
 
-                    <img src="<?= e(safeUrl($product['image'] ?? '', '')) ?>" id="mainImage" alt="<?= e($product['title']) ?>">
+                    <?php if ($mainImg !== ''): ?>
+                        <img src="<?= e($mainImg) ?>" id="mainImage" alt="<?= e($product['title']) ?>">
+                    <?php else: ?>
+                        <div class="w-100 h-100 d-flex align-items-center justify-content-center bg-light text-dark" id="mainImagePlaceholder">
+                            <i class="bi bi-image display-1 opacity-50" aria-hidden="true"></i>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -182,7 +189,7 @@ if (!empty($product['cat_id'])) {
         <div class="col-lg-5">
             <div class="h-100 d-flex flex-column product-info-card">
 
-                <h1 class="display-5 street-font mb-2 text-break" style="line-height: 1.2; text-shadow: 2px 2px 0 #ccc;">
+                <h1 class="display-5 street-font mb-2 text-break" style="line-height: 1.2;">
                     <?= e($product['title']) ?>
                 </h1>
 
@@ -253,11 +260,18 @@ if (!empty($product['cat_id'])) {
             </h3>
             <div class="row g-4">
                 <?php foreach ($related as $p): ?>
+                    <?php $relImg = safeUrl($p['image'] ?? '', ''); ?>
                     <div class="col-6 col-md-3">
                         <a href="/pages/product.php?id=<?= (int)$p['id'] ?>" class="text-decoration-none">
                             <div class="card h-100 rounded-0 related-card">
                                 <div class="position-relative" style="padding-top: 100%; overflow: hidden;">
-                                    <img src="<?= e(safeUrl($p['image'] ?? '', '')) ?>" alt="<?= e($p['title']) ?>" class="position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
+                                    <?php if ($relImg !== ''): ?>
+                                        <img src="<?= e($relImg) ?>" alt="<?= e($p['title']) ?>" class="position-absolute top-0 start-0 w-100 h-100 object-fit-cover">
+                                    <?php else: ?>
+                                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-light text-dark">
+                                            <i class="bi bi-image fs-1 opacity-50" aria-hidden="true"></i>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="card-body p-3">
                                     <div class="street-font small text-truncate text-dark mb-1"><?= e($p['title']) ?></div>
@@ -274,31 +288,43 @@ if (!empty($product['cat_id'])) {
 </div>
 
 <script>
+const container = document.getElementById('mainImageContainer');
+let img = document.getElementById('mainImage');
+
 document.querySelectorAll('.thumb-item').forEach(btn => {
     btn.addEventListener('click', function() {
         const src = this.dataset.src;
         if (!src) return;
-        document.getElementById('mainImage').src = src;
+        if (!img && container) {
+            const ph = document.getElementById('mainImagePlaceholder');
+            if (ph) ph.remove();
+            img = document.createElement('img');
+            img.id = 'mainImage';
+            img.alt = <?= json_encode($product['title'], JSON_UNESCAPED_UNICODE) ?>;
+            container.appendChild(img);
+        }
+        if (img) img.src = src;
         document.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('active-thumb'));
         this.classList.add('active-thumb');
     });
 });
 
-const container = document.getElementById('mainImageContainer');
-const img = document.getElementById('mainImage');
-
-if (container && img && window.matchMedia('(hover: hover)').matches) {
+if (container && window.matchMedia('(hover: hover)').matches) {
     container.addEventListener('mousemove', function(e) {
+        const activeImg = document.getElementById('mainImage');
+        if (!activeImg) return;
         const { left, top, width, height } = container.getBoundingClientRect();
         const x = (e.clientX - left) / width * 100;
         const y = (e.clientY - top) / height * 100;
-        img.style.transformOrigin = `${x}% ${y}%`;
-        img.style.transform = 'scale(2)';
+        activeImg.style.transformOrigin = `${x}% ${y}%`;
+        activeImg.style.transform = 'scale(2)';
     });
 
     container.addEventListener('mouseleave', function() {
-        img.style.transformOrigin = 'center center';
-        img.style.transform = 'scale(1)';
+        const activeImg = document.getElementById('mainImage');
+        if (!activeImg) return;
+        activeImg.style.transformOrigin = 'center center';
+        activeImg.style.transform = 'scale(1)';
     });
 }
 </script>

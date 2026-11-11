@@ -144,7 +144,7 @@ function time_ago($datetime) {
     <!-- ЗАГОЛОВОК СТРАНИЦЫ -->
     <div class="mb-5 border-bottom border-white border-2 pb-3 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-end">
         <div>
-            <a href="/index.php" class="text-decoration-none fw-bold text-light mb-2 d-inline-block small text-uppercase street-font">
+            <a href="/" class="text-decoration-none fw-bold text-light mb-2 d-inline-block small text-uppercase street-font">
                 <i class="bi bi-arrow-left"></i> На главную
             </a>
             <h1 class="display-3 street-font m-0 text-white" style="letter-spacing: 2px;">
@@ -157,7 +157,7 @@ function time_ago($datetime) {
         </div>
 
         <?php if ($catFilterId > 0): ?>
-            <a href="topics_list.php" class="btn btn-outline-light rounded-0 border-2 street-font mt-3 mt-md-0">
+            <a href="/pages/topics_list.php" class="btn btn-outline-light rounded-0 border-2 street-font mt-3 mt-md-0">
                 <i class="bi bi-x-lg"></i> Сбросить фильтр
             </a>
         <?php endif; ?>
@@ -169,8 +169,8 @@ function time_ago($datetime) {
         <div class="col-lg-8">
 
             <!-- Панель поиска и фильтра -->
-            <div class="mb-5 sticky-top pt-2" style="top: 85px; z-index: 90;">
-                <form method="GET" action="topics_list.php" id="searchForm" class="d-flex shadow-lg">
+            <div class="mb-5 sticky-lg-top pt-2" style="top: 85px; z-index: 90;">
+                <form method="GET" action="/pages/topics_list.php" id="searchForm" class="d-flex shadow-lg">
                     <?php if ($catFilterId > 0): ?>
                         <input type="hidden" name="cat" value="<?= (int)$catFilterId ?>">
                     <?php endif; ?>
@@ -204,7 +204,7 @@ function time_ago($datetime) {
                         <i class="bi bi-search fs-1 mb-3 d-block"></i>
                         <h4 class="street-font">Темы не найдены</h4>
                         <p class="text-muted fw-bold">Попробуйте изменить параметры фильтра.</p>
-                        <a href="topics_list.php" class="btn btn-black rounded-0 text-uppercase fw-bold mt-2">Смотреть всё</a>
+                        <a href="/pages/topics_list.php" class="btn btn-black rounded-0 text-uppercase fw-bold mt-2">Смотреть всё</a>
                     </div>
                 <?php else: ?>
                     <?php foreach ($allTopics as $t): ?>
@@ -262,7 +262,7 @@ function time_ago($datetime) {
                         if ($search !== '') $baseQuery['q'] = $search;
                     ?>
                     <?php if ($page > 1): ?>
-                        <a href="topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page - 1])) ?>" class="btn btn-outline-light rounded-0 street-font btn-sm">
+                        <a href="/pages/topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page - 1])) ?>" class="btn btn-outline-light rounded-0 street-font btn-sm">
                             <i class="bi bi-arrow-left"></i> Назад
                         </a>
                     <?php else: ?>
@@ -270,7 +270,7 @@ function time_ago($datetime) {
                     <?php endif; ?>
                     <span class="street-font text-street-yellow small">Стр. <?= $page ?> из <?= $totalPages ?></span>
                     <?php if ($page < $totalPages): ?>
-                        <a href="topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page + 1])) ?>" class="btn btn-warning text-dark rounded-0 street-font btn-sm fw-bold">
+                        <a href="/pages/topics_list.php?<?= e(http_build_query($baseQuery + ['page' => $page + 1])) ?>" class="btn btn-warning text-dark rounded-0 street-font btn-sm fw-bold">
                             Далее <i class="bi bi-arrow-right"></i>
                         </a>
                     <?php else: ?>
@@ -283,7 +283,7 @@ function time_ago($datetime) {
 
         <!-- ПРАВАЯ КОЛОНКА (Сайдбар) -->
         <div class="col-lg-4">
-            <div class="card rounded-0 sidebar-card sticky-top" style="top: 100px;">
+            <div class="card rounded-0 sidebar-card sticky-lg-top" style="top: 100px;">
                 <div class="card-header bg-black text-white rounded-0 py-3 border-bottom border-dark">
                     <h5 class="street-font m-0">
                         <i class="bi bi-lightning-charge-fill text-street-yellow"></i> Свежак
@@ -328,11 +328,11 @@ function time_ago($datetime) {
             </div>
             <div class="modal-body p-0 bg-white">
                 <div class="list-group list-group-flush">
-                    <a href="topics_list.php" class="list-group-item list-group-item-action p-3 cat-modal-item bg-light text-center border-bottom-2 border-dark">
+                    <a href="/pages/topics_list.php" class="list-group-item list-group-item-action p-3 cat-modal-item bg-light text-center border-bottom-2 border-dark">
                         <i class="bi bi-grid-fill me-2"></i> ВСЕ ТЕМЫ
                     </a>
                     <?php foreach ($allCats as $c): ?>
-                        <a href="topics_list.php?cat=<?= (int)$c['id'] ?>" class="list-group-item list-group-item-action p-3 cat-modal-item d-flex justify-content-between align-items-center">
+                        <a href="/pages/topics_list.php?cat=<?= (int)$c['id'] ?>" class="list-group-item list-group-item-action p-3 cat-modal-item d-flex justify-content-between align-items-center">
                             <span><?= e($c['title']) ?></span>
                             <i class="bi bi-chevron-right opacity-50"></i>
                         </a>

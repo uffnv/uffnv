@@ -27,12 +27,13 @@ for secret_file in "config/db.local.php" "config/secrets.local.php"; do
     fi
 done
 
-# 4. Каталоги пользовательских и админских загрузок (Uploads)
-echo "4/5 Настройка каталогов загрузки (uploads/avatars, assets/uploads)..."
-mkdir -p uploads/avatars assets/uploads
+# 4. Каталоги пользовательских/админских загрузок и изолированных сессий
+echo "4/5 Настройка uploads и storage/sessions..."
+mkdir -p uploads/avatars assets/uploads storage/sessions
 chmod -R 775 uploads uploads/avatars assets/uploads
-# Защитные .htaccess внутри загрузок должны остаться 644
-for ht in "uploads/avatars/.htaccess" "assets/uploads/.htaccess"; do
+chmod 700 storage storage/sessions 2>/dev/null || chmod 755 storage && chmod 700 storage/sessions
+# Защитные .htaccess должны остаться 644
+for ht in "uploads/avatars/.htaccess" "assets/uploads/.htaccess" "storage/sessions/.htaccess"; do
     if [ -f "${ht}" ]; then
         chmod 644 "${ht}"
     fi

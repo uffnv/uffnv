@@ -36,7 +36,7 @@ $curPage = basename($_SERVER['PHP_SELF']);
     <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/assets/css/style.css?v=3">
+    <link rel="stylesheet" href="/assets/css/style.css?v=4">
 
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -89,12 +89,12 @@ $curPage = basename($_SERVER['PHP_SELF']);
                                     <?php if ($notifCount > 0): ?><span class="badge bg-danger rounded-0"><?= $notifCount ?> новых</span><?php endif; ?>
                                 </div>
                                 <?php if (empty($notifications)): ?>
-                                    <div class="p-4 text-center text-muted fw-bold"><i class="bi bi-check-circle fs-3 d-block mb-1 opacity-25" aria-hidden="true"></i>Тихо...</div>
+                                    <div class="p-4 text-center text-white-50 fw-bold"><i class="bi bi-check-circle fs-3 d-block mb-1 opacity-50" aria-hidden="true"></i>Тихо...</div>
                                 <?php else: ?>
                                     <?php foreach ($notifications as $notif): ?>
                                         <a href="<?= e(safeUrl($notif['link'], '#')) ?>" class="notif-item <?= !empty($notif['is_read']) ? 'read' : 'unread' ?>" onclick="markAsRead(<?= (int)$notif['id'] ?>)">
                                             <div class="d-flex justify-content-between mb-1">
-                                                <small class="fw-bold text-uppercase text-secondary" style="font-size: 0.6rem;"><?= date('d.m H:i', strtotime($notif['created_at'])) ?></small>
+                                                <small class="fw-bold text-uppercase text-white-50" style="font-size: 0.65rem;"><?= date('d.m H:i', strtotime($notif['created_at'])) ?></small>
                                             </div>
                                             <div style="line-height: 1.2; font-size: 0.85rem; font-weight: 700;"><?= e($notif['message']) ?></div>
                                         </a>
@@ -120,7 +120,10 @@ $curPage = basename($_SERVER['PHP_SELF']);
                             УВЕДОМЛЕНИЯ <?php if ($notifCount > 0): ?><span class="badge bg-danger ms-2"><?= $notifCount ?></span><?php endif; ?>
                         </a>
                         <a href="/pages/profile.php" class="nav-link-street mb-2">МОЙ ПРОФИЛЬ</a>
-                        <a href="/actions/logout.php" class="nav-link-street text-secondary">ВЫЙТИ</a>
+                        <form action="/actions/logout.php" method="POST" class="m-0">
+                            <?= csrfField() ?>
+                            <button type="submit" class="nav-link-street text-warning text-start bg-transparent border-0">ВЫЙТИ</button>
+                        </form>
                     <?php else: ?>
                         <a href="/pages/login.php" class="nav-link-street">ВОЙТИ В АККАУНТ</a>
                     <?php endif; ?>

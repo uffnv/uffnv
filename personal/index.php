@@ -76,7 +76,7 @@ include __DIR__ . '/../includes/header.php';
         <h1 class="street-font display-4 text-white mb-2" style="letter-spacing: 3px;">
             NEURAL<span style="color: cyan;">_HUB</span>
         </h1>
-        <p class="mono-font text-secondary">
+        <p class="mono-font text-light opacity-75">
             // WELCOME USER: <span class="text-white"><?= e($username) ?></span><br>
             // ANALYZING PREFERENCES... [COMPLETE]
         </p>
@@ -95,17 +95,17 @@ include __DIR__ . '/../includes/header.php';
         <div class="row g-3">
             <?php foreach ($recTopics as $topic): ?>
             <div class="col-lg-6" data-aos="fade-up">
-                <div class="topic-card p-4 h-100 d-flex justify-content-between align-items-center">
-                    <div>
+                <div class="topic-card p-3 p-sm-4 h-100 d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
+                    <div class="min-w-0">
                         <div class="mb-2 text-info mono-font" style="font-size: 0.7rem;">
                             <span class="status-dot me-1"></span> LIVE THREAD
                         </div>
-                        <h5 class="mono-font text-white fw-bold mb-1 text-uppercase"><?= e($topic['title']) ?></h5>
-                        <p class="text-white-50 small mb-0">
+                        <h5 class="mono-font text-white fw-bold mb-1 text-uppercase text-break"><?= e($topic['title']) ?></h5>
+                        <p class="text-light opacity-75 small mb-0">
                             #<?= (int)$topic['id'] ?> • <?= date('d.m.Y', strtotime($topic['created_at'])) ?>
                         </p>
                     </div>
-                    <a href="/pages/topic.php?id=<?= (int)$topic['id'] ?>" class="btn-cyber-sm px-3 py-2 ms-3">
+                    <a href="/pages/topic.php?id=<?= (int)$topic['id'] ?>" class="btn-cyber-sm px-3 py-2 flex-shrink-0">
                         READ_LOG
                     </a>
                 </div>
@@ -120,21 +120,21 @@ include __DIR__ . '/../includes/header.php';
     <div class="mb-5">
         <div class="section-header" style="border-color: #bc13fe;" data-aos="fade-right">
             <h2 class="street-font text-white mb-0 fs-3">ВНЕШНИЙ ИНТЕЛЛЕКТ</h2>
-            <div class="mono-font small" style="color: #bc13fe;">&gt; CURATED_OPEN_SOURCES... [READY]</div>
+            <div class="mono-font small" style="color: #e09eff;">&gt; CURATED_OPEN_SOURCES... [READY]</div>
         </div>
         <div class="row g-4">
             <?php foreach ($recIntel as $link): ?>
             <div class="col-md-6" data-aos="flip-up">
                 <div class="material-card h-100 p-4 position-relative" style="background: linear-gradient(135deg, #0d0d0d 0%, #1a002a 100%);">
-                    <div class="position-absolute top-0 end-0 m-3 mono-font text-white-50 small" style="font-size: 0.65rem; opacity: 0.4;">
+                    <div class="position-absolute top-0 end-0 m-3 mono-font text-light opacity-75 small" style="font-size: 0.65rem;">
                         SRC: <?= e(parse_url($link['url'], PHP_URL_HOST)) ?>
                     </div>
                     <h4 class="text-white street-font mb-2 pe-4" style="letter-spacing: 1px;"><?= e($link['title']) ?></h4>
-                    <p class="text-secondary small mb-4 mono-font">
+                    <p class="text-light opacity-75 small mb-4 mono-font">
                         <?= e($link['desc']) ?>
                     </p>
-                    <a href="<?= e(safeUrl($link['url'])) ?>" target="_blank" rel="noopener noreferrer" class="text-decoration-none fw-bold small mono-font" style="color: #bc13fe;">
-                        <span class="border border-secondary px-2 py-1">OPEN_CONNECTION_URL</span>
+                    <a href="<?= e(safeUrl($link['url'])) ?>" target="_blank" rel="noopener noreferrer" class="text-decoration-none fw-bold small mono-font" style="color: #e09eff;">
+                        <span class="border border-secondary px-2 py-1 d-inline-block">OPEN_CONNECTION_URL</span>
                     </a>
                 </div>
             </div>
@@ -150,7 +150,7 @@ include __DIR__ . '/../includes/header.php';
             <h2 class="street-font text-white mb-0 fs-3">РЕДКИЙ ЛУТ</h2>
             <div class="mono-font small text-warning">&gt; STORE_OFFERS</div>
         </div>
-        <div class="row g-4">
+        <div class="row g-3 g-md-4">
             <?php foreach ($recProducts as $product):
                 $pImg = !empty($product['image']) ? '/' . ltrim($product['image'], '/') : '';
             ?>
@@ -160,13 +160,13 @@ include __DIR__ . '/../includes/header.php';
                         <?php if ($pImg !== ''): ?>
                             <img src="<?= e($pImg) ?>" alt="<?= e($product['title']) ?>">
                         <?php else: ?>
-                            <i class="bi bi-box-seam fs-1 text-secondary" aria-hidden="true"></i>
+                            <i class="bi bi-box-seam fs-1 text-light opacity-50" aria-hidden="true"></i>
                         <?php endif; ?>
                     </div>
-                    <div class="p-3">
+                    <div class="p-2 p-sm-3">
                         <h6 class="text-white street-font text-truncate mb-2"><?= e($product['title']) ?></h6>
-                        <div class="d-flex justify-content-between align-items-end">
-                            <span class="text-warning mono-font fw-bold fs-5"><?= number_format((float)$product['price'], 0, '.', ' ') ?> ₽</span>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span class="text-warning mono-font fw-bold fs-6 fs-md-5"><?= number_format((float)$product['price'], 0, '.', ' ') ?> ₽</span>
                             <a href="/pages/product.php?id=<?= (int)$product['id'] ?>" class="btn btn-sm btn-outline-warning rounded-0 border-2 fw-bold">
                                 BUY
                             </a>
@@ -181,11 +181,11 @@ include __DIR__ . '/../includes/header.php';
 
     <!-- ЕСЛИ ПУСТО -->
     <?php if (empty($recTopics) && empty($recIntel) && empty($recProducts)): ?>
-        <div class="text-center py-5 mono-font text-secondary border border-dark bg-black p-5">
+        <div class="text-center py-5 mono-font text-light opacity-75 border border-dark bg-black p-4 p-md-5">
             <i class="bi bi-cpu fs-1 mb-3 d-block text-danger" aria-hidden="true"></i>
             <h3 class="text-white">НЕДОСТАТОЧНО ДАННЫХ</h3>
             <p>&gt; Проявляйте активность на форуме, чтобы система подобрала рекомендации.</p>
-            <a href="/index.php" class="btn btn-outline-info rounded-0 mt-3">НА ГЛАВНУЮ</a>
+            <a href="/" class="btn btn-outline-info rounded-0 mt-3">НА ГЛАВНУЮ</a>
         </div>
     <?php endif; ?>
 

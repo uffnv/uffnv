@@ -205,13 +205,13 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if ($totalPages > 1): ?>
         <div class="mt-4 d-flex justify-content-between align-items-center bg-black border border-2 border-white p-3">
             <?php if ($page > 1): ?>
-                <a href="notifications.php?page=<?= $page - 1 ?>" class="btn btn-outline-light rounded-0 btn-sm street-font">Назад</a>
+                <a href="/pages/notifications.php?page=<?= $page - 1 ?>" class="btn btn-outline-light rounded-0 btn-sm street-font">Назад</a>
             <?php else: ?>
                 <span></span>
             <?php endif; ?>
             <span class="street-font text-street-yellow small">Стр. <?= $page ?> из <?= $totalPages ?></span>
             <?php if ($page < $totalPages): ?>
-                <a href="notifications.php?page=<?= $page + 1 ?>" class="btn btn-warning text-dark rounded-0 btn-sm street-font fw-bold">Далее</a>
+                <a href="/pages/notifications.php?page=<?= $page + 1 ?>" class="btn btn-warning text-dark rounded-0 btn-sm street-font fw-bold">Далее</a>
             <?php else: ?>
                 <span></span>
             <?php endif; ?>

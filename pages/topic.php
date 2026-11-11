@@ -115,7 +115,6 @@ require_once __DIR__ . '/../includes/header.php';
     }
     .author-col {
         background: #f0f0f0;
-        border-right: 3px solid #000;
     }
     .avatar-img {
         width: 100px;
@@ -173,7 +172,7 @@ require_once __DIR__ . '/../includes/header.php';
         ?>
         <div class="card post-card rounded-0 mb-4 border-warning" style="border-width: 4px;" id="topic-op">
             <div class="row g-0">
-                <div class="col-md-3 col-lg-2 author-col p-4 text-center d-flex flex-column align-items-center">
+                <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark p-4 text-center d-flex flex-column align-items-center">
                     <?php if (!empty($topic['user_id'])): ?>
                         <a href="/pages/user.php?id=<?= (int)$topic['user_id'] ?>" title="Профиль автора">
                     <?php endif; ?>
@@ -205,7 +204,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <button type="button"
                                     class="btn btn-sm btn-link text-dark fw-bold text-decoration-none p-0 text-uppercase street-font js-reply-btn"
                                     data-username="<?= e($opName) ?>">
-                                <i class="bi bi-reply-fill text-warning" aria-hidden="true"></i> Ответить
+                                <i class="bi bi-reply-fill text-dark" aria-hidden="true"></i> Ответить
                             </button>
                         <?php endif; ?>
                     </div>
@@ -231,7 +230,7 @@ require_once __DIR__ . '/../includes/header.php';
             ?>
                 <div class="card post-card rounded-0" id="post-<?= (int)$post['id'] ?>">
                     <div class="row g-0">
-                        <div class="col-md-3 col-lg-2 author-col p-4 text-center d-flex flex-column align-items-center">
+                        <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark p-4 text-center d-flex flex-column align-items-center">
                             <?php if ($postUserId > 0): ?>
                                 <a href="/pages/user.php?id=<?= $postUserId ?>" title="Перейти в профиль">
                             <?php endif; ?>
@@ -286,7 +285,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <button type="button"
                                                 class="btn btn-sm btn-link text-dark fw-bold text-decoration-none p-0 text-uppercase street-font js-reply-btn"
                                                 data-username="<?= e($postName) ?>">
-                                            <i class="bi bi-reply-fill text-warning" aria-hidden="true"></i> Ответить
+                                            <i class="bi bi-reply-fill text-dark" aria-hidden="true"></i> Ответить
                                         </button>
                                     <?php endif; ?>
                                 </div>

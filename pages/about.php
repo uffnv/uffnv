@@ -117,7 +117,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="tape-strip"></div>
 
         <div class="text-center mb-5 pt-3">
-            <h1 class="display-3 street-font mb-0" style="letter-spacing: -1px; text-shadow: 3px 3px 0 #ccc;">
+            <h1 class="display-3 street-font mb-0" style="letter-spacing: -1px;">
                 UFFNV <span style="color: #000;">CLOTHING</span>
             </h1>
             <p class="lead street-font text-muted mt-2 border-bottom border-4 border-dark d-inline-block pb-1" style="font-size: 1.2rem;">

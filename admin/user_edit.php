@@ -4,7 +4,7 @@ require_once __DIR__ . '/admin_auth.php';
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
-    header("Location: users.php");
+    header("Location: /admin/users.php");
     exit;
 }
 
@@ -27,13 +27,13 @@ $allowedRoles = isSuperAdmin() ? ['user', 'admin', 'super_admin', 'banned'] : ['
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrfOrRedirect('/admin/user_edit.php?id=' . $id);
 
-    $username  = trim($_POST['username'] ?? '');
-    $email     = trim($_POST['email'] ?? '');
-    $full_name = trim($_POST['full_name'] ?? '');
-    $new_pass  = trim($_POST['new_password'] ?? '');
+    $username  = trim((string)($_POST['username'] ?? ''));
+    $email     = mb_strtolower(trim((string)($_POST['email'] ?? '')), 'UTF-8');
+    $full_name = mb_substr(trim((string)($_POST['full_name'] ?? '')), 0, 100, 'UTF-8');
+    $new_pass  = (string)($_POST['new_password'] ?? '');
 
-    if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        redirectWithFlash('/admin/user_edit.php?id=' . $id, 'Укажите корректные никнейм и email.', 'danger');
+    if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.\-]{3,30}$/u', $username) || !validateEmailStrict($email)) {
+        redirectWithFlash('/admin/user_edit.php?id=' . $id, 'Никнейм (3–30 символов без пробелов) и Email (латиница) обязательны.', 'danger');
     }
 
     $role = $user['role'];
@@ -43,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($new_pass !== '') {
-            if (mb_strlen($new_pass, 'UTF-8') < 6) {
-                redirectWithFlash('/admin/user_edit.php?id=' . $id, 'Пароль должен быть не менее 6 символов.', 'danger');
+            if (strlen($new_pass) < 6 || strlen($new_pass) > 64 || !preg_match('/^[\x21-\x7E]+$/', $new_pass)) {
+                redirectWithFlash('/admin/user_edit.php?id=' . $id, 'Новый пароль: 6–64 символа латиницы и цифр без пробелов.', 'danger');
             }
             $hash = password_hash($new_pass, PASSWORD_DEFAULT);
             $sql = "UPDATE users SET username = ?, email = ?, full_name = ?, role = ?, password_hash = ? WHERE id = ?";
@@ -66,7 +66,7 @@ $avatarSrc = getAvatarUrl($user['avatar'] ?? '');
 ?>
 
 <div class="d-flex align-items-center mb-4">
-    <a href="users.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
+    <a href="/admin/users.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
     <h2 class="fw-black text-uppercase m-0">Редактирование: @<?= e($user['username']) ?></h2>
 </div>
 

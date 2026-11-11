@@ -162,13 +162,14 @@ require_once __DIR__ . '/../includes/header.php';
                     <?= e($errors['general']) ?>
                 </div>
             <?php endif; ?>
-            <form method="POST" action="/actions/signup.php">
+            <form method="POST" action="/actions/signup.php" data-validate-form data-prevent-double-submit="1" novalidate>
                 <?= csrfField() ?>
 
                 <div class="mb-3">
                     <label for="regUsername" class="street-label">Никнейм</label>
-                    <input type="text" id="regUsername" name="username" required minlength="3" maxlength="32"
+                    <input type="text" id="regUsername" name="username" required minlength="3" maxlength="30"
                            class="form-control street-input <?= isset($errors['username']) ? 'is-invalid' : '' ?>"
+                           data-rule="username"
                            placeholder="Придумай имя"
                            value="<?= e($old['username'] ?? '') ?>">
                     <?php if (isset($errors['username'])): ?>
@@ -178,8 +179,9 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <div class="mb-3">
                     <label for="regEmail" class="street-label">Email</label>
-                    <input type="email" id="regEmail" name="email" required
+                    <input type="email" id="regEmail" name="email" required maxlength="100"
                            class="form-control street-input <?= isset($errors['email']) ? 'is-invalid' : '' ?>"
+                           data-rule="email"
                            placeholder="name@example.com"
                            value="<?= e($old['email'] ?? '') ?>">
                     <?php if (isset($errors['email'])): ?>
@@ -189,9 +191,10 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <div class="mb-3">
                     <label for="regPassword" class="street-label">Пароль</label>
-                    <input type="password" id="regPassword" name="password" required minlength="6"
+                    <input type="password" id="regPassword" name="password" required minlength="6" maxlength="64"
                            class="form-control street-input <?= isset($errors['password']) ? 'is-invalid' : '' ?>"
-                           placeholder="Минимум 6 символов" autocomplete="new-password">
+                           data-rule="password-register"
+                           placeholder="Минимум 6 символов (латиница + цифра)" autocomplete="new-password">
                     <?php if (isset($errors['password'])): ?>
                         <div class="street-error"><?= e($errors['password']) ?></div>
                     <?php endif; ?>
@@ -199,8 +202,9 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <div class="mb-4">
                     <label for="regPasswordConfirm" class="street-label">Подтверждение</label>
-                    <input type="password" id="regPasswordConfirm" name="password_confirm" required minlength="6"
+                    <input type="password" id="regPasswordConfirm" name="password_confirm" required minlength="6" maxlength="64"
                            class="form-control street-input <?= isset($errors['password_confirm']) ? 'is-invalid' : '' ?>"
+                           data-rule="password-confirm"
                            placeholder="Повтори пароль" autocomplete="new-password">
                     <?php if (isset($errors['password_confirm'])): ?>
                         <div class="street-error"><?= e($errors['password_confirm']) ?></div>
@@ -221,7 +225,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php endif; ?>
                     <div class="d-flex align-items-start gap-2 mt-1">
                         <input type="checkbox" name="promo_consent" id="promo_consent" class="street-checkbox">
-                        <label for="promo_consent" class="small text-muted text-uppercase" style="font-size: 0.65rem; line-height: 1.2;">
+                        <label for="promo_consent" class="small text-dark opacity-75 fw-bold text-uppercase" style="font-size: 0.68rem; line-height: 1.25;">
                             Получать уведомления о дропах, релизах и закрытых акциях UFFNV (38-ФЗ)
                         </label>
                     </div>

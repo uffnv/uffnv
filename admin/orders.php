@@ -38,11 +38,11 @@ $stmt->execute();
 $orders = $stmt->fetchAll();
 
 $statusColors = [
-    'new'        => 'primary',
-    'processing' => 'info',
-    'shipped'    => 'warning',
-    'completed'  => 'success',
-    'cancelled'  => 'danger',
+    'new'        => 'bg-primary',
+    'processing' => 'bg-info text-dark',
+    'shipped'    => 'bg-warning text-dark',
+    'completed'  => 'bg-success',
+    'cancelled'  => 'bg-danger',
 ];
 $statusNames = [
     'new'        => 'Новый',
@@ -91,12 +91,12 @@ $statusNames = [
                             <?= date('d.m.Y H:i', strtotime($o['created_at'])) ?>
                         </td>
                         <td>
-                            <span class="badge bg-<?= e($badgeColor) ?> rounded-0 text-uppercase">
+                            <span class="badge <?= e($badgeColor) ?> rounded-0 text-uppercase">
                                 <?= e($statusText) ?>
                             </span>
                         </td>
                         <td class="text-end">
-                            <a href="order_view.php?id=<?= (int)$o['id'] ?>" class="btn btn-sm btn-admin btn-admin-dark">
+                            <a href="/admin/order_view.php?id=<?= (int)$o['id'] ?>" class="btn btn-sm btn-admin btn-admin-dark">
                                 <i class="bi bi-eye-fill me-1" aria-hidden="true"></i> Подробнее
                             </a>
                         </td>

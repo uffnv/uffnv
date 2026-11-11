@@ -8,6 +8,9 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
+$oldLogin = $_SESSION['old'] ?? [];
+unset($_SESSION['old']);
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -113,6 +116,16 @@ require_once __DIR__ . '/../includes/header.php';
             </p>
         </div>
 
+        <?php if (!empty($_GET['timeout'])): ?>
+            <div class="alert alert-warning rounded-0 border-3 border-dark fw-bold mb-4 shadow-sm text-center text-dark">
+                <i class="bi bi-clock-history me-2"></i> Сессия завершена по таймауту или из соображений безопасности. Войдите снова.
+            </div>
+        <?php elseif (!empty($_GET['logged_out'])): ?>
+            <div class="alert alert-info rounded-0 border-3 border-dark fw-bold mb-4 shadow-sm text-center text-dark">
+                <i class="bi bi-box-arrow-right me-2"></i> Вы вышли из аккаунта.
+            </div>
+        <?php endif; ?>
+
         <?php if (isset($_SESSION['error'])): ?>
             <div class="alert alert-danger rounded-0 border-3 border-dark fw-bold mb-4 shadow-sm text-center">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= e($_SESSION['error']); unset($_SESSION['error']); ?>
@@ -125,7 +138,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <form action="/actions/signin.php" method="POST">
+        <form action="/actions/signin.php" method="POST" data-validate-form data-auth-mode="login" novalidate>
             <?= csrfField() ?>
             <div class="mb-4">
                 <label for="loginEmail" class="street-font small text-muted mb-2">Твой Email</label>
@@ -133,7 +146,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
                         <i class="bi bi-envelope-fill"></i>
                     </span>
-                    <input type="email" id="loginEmail" name="email" class="form-control form-control-lg rounded-0" placeholder="mail@example.com" required autocomplete="email">
+                    <input type="email" id="loginEmail" name="email" class="form-control form-control-lg rounded-0" placeholder="mail@example.com" value="<?= e($oldLogin['email'] ?? '') ?>" data-rule="email" required autocomplete="email">
                 </div>
             </div>
 
@@ -143,7 +156,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
                         <i class="bi bi-lock-fill"></i>
                     </span>
-                    <input type="password" id="loginPassword" name="password" class="form-control form-control-lg rounded-0" placeholder="••••••••" required autocomplete="current-password">
+                    <input type="password" id="loginPassword" name="password" class="form-control form-control-lg rounded-0" placeholder="••••••••" data-rule="password-login" required autocomplete="current-password">
                 </div>
             </div>
 

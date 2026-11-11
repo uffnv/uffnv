@@ -28,7 +28,7 @@ try {
 
     if ($user && password_verify($password, $user['password_hash'])) {
         unset($_SESSION['error'], $_SESSION['old']);
-        regenerateAppSession();
+        regenerateAppSession($pdo);
 
         $_SESSION['user_id'] = (int)$user['id'];
         $_SESSION['username'] = $user['username'];
@@ -39,6 +39,7 @@ try {
         getActiveForumBan($pdo, (int)$user['id']);
 
         if (isAdmin()) {
+            initAdminSessionMetadata();
             header("Location: /admin/index.php");
         } else {
             header("Location: /pages/profile.php");

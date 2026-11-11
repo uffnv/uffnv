@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 2. Сохранение/создание товара
     $title     = trim($_POST['title'] ?? '');
-    $price     = max(0, (int)round((float)($_POST['price'] ?? 0)));
+    $price     = (int)round((float)($_POST['price'] ?? 0));
     $old_price = (!empty($_POST['old_price']) && (float)$_POST['old_price'] > 0)
         ? (int)round((float)$_POST['old_price'])
         : 0;
@@ -52,8 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $is_new    = isset($_POST['is_new']) ? 1 : 0;
     $is_active = isset($_POST['is_active']) ? 1 : 0;
 
-    if ($title === '') {
-        redirectWithFlash($redirectSelf, 'Название товара обязательно.', 'danger');
+    if ($title === '' || mb_strlen($title, 'UTF-8') > 200) {
+        redirectWithFlash($redirectSelf, 'Название товара обязательно (до 200 символов).', 'danger');
+    }
+    if ($price < 1 || $price > 9999999) {
+        redirectWithFlash($redirectSelf, 'Цена товара должна быть от 1 до 9 999 999 ₽.', 'danger');
+    }
+    if ($old_price > 0 && ($old_price <= $price || $old_price > 9999999)) {
+        redirectWithFlash($redirectSelf, 'Старая цена (зачёркнутая) должна быть больше текущей цены и не превышать 9 999 999 ₽.', 'danger');
+    }
+    if ($cat_id > 0) {
+        $catExists = $pdo->prepare("SELECT id FROM shop_categories WHERE id = ? LIMIT 1");
+        $catExists->execute([$cat_id]);
+        if (!$catExists->fetch()) {
+            redirectWithFlash($redirectSelf, 'Выбранная категория магазина не существует.', 'danger');
+        }
     }
 
     // Главное фото (через безопасный anti-RCE загрузчик)
@@ -138,11 +151,11 @@ require_once __DIR__ . '/layout_header.php';
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="prodPrice" class="fw-bold small text-muted mb-1">ЦЕНА (₽, целое)</label>
-                        <input id="prodPrice" type="number" name="price" min="0" step="1" class="form-control" value="<?= $isEdit ? (int)$product['price'] : '' ?>" required>
+                        <input id="prodPrice" type="number" name="price" min="1" max="9999999" step="1" class="form-control" value="<?= $isEdit ? (int)$product['price'] : '' ?>" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="prodOldPrice" class="fw-bold small text-muted mb-1">СТАРАЯ ЦЕНА</label>
-                        <input id="prodOldPrice" type="number" name="old_price" min="0" step="1" class="form-control" value="<?= ($isEdit && (int)$product['old_price'] > 0) ? (int)$product['old_price'] : '' ?>">
+                        <input id="prodOldPrice" type="number" name="old_price" min="0" max="9999999" step="1" class="form-control" value="<?= ($isEdit && (int)$product['old_price'] > 0) ? (int)$product['old_price'] : '' ?>">
                     </div>
                 </div>
             </div>
@@ -157,7 +170,7 @@ require_once __DIR__ . '/layout_header.php';
                 </div>
 
                 <?php if ($isEdit && !empty($gallery)): ?>
-                    <label class="fw-bold small text-muted mb-2">ТЕКУЩИЕ ФОТО:</label>
+                    <div class="fw-bold small text-muted mb-2">ТЕКУЩИЕ ФОТО:</div>
                     <div class="d-flex flex-wrap gap-2">
                         <?php foreach ($gallery as $img): ?>
                             <div class="position-relative border border-2 border-dark" style="width: 100px; height: 100px;">

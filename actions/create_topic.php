@@ -26,16 +26,25 @@ $content    = trim($_POST['content'] ?? '');
 $categoryId = (int)($_POST['category_id'] ?? 0);
 $type       = in_array($_POST['type'] ?? 'standard', ['standard', 'general'], true) ? $_POST['type'] : 'standard';
 
-if ($title === '' || $content === '' || $categoryId <= 0) {
-    redirectWithFlash('/pages/create_topic.php', 'Заполните заголовок, категорию и текст темы.', 'danger');
+$oldTopic = [
+    'title'       => $title,
+    'content'     => $content,
+    'category_id' => $categoryId,
+];
+
+if (mb_strlen($title, 'UTF-8') < 3 || mb_strlen($title, 'UTF-8') > 200 || $content === '' || $categoryId <= 0) {
+    $_SESSION['old'] = $oldTopic;
+    redirectWithFlash('/pages/create_topic.php', 'Выберите раздел и заполните заголовок (от 3 символов) и текст темы.', 'danger');
 }
 
 try {
     $catCheck = $pdo->prepare("SELECT id FROM categories WHERE id = ? AND is_approved = 1 LIMIT 1");
     $catCheck->execute([$categoryId]);
     if (!$catCheck->fetch()) {
+        $_SESSION['old'] = $oldTopic;
         redirectWithFlash('/pages/create_topic.php', 'Выбранная категория недоступна или не найдена.', 'danger');
     }
+    unset($_SESSION['old']);
 
     $stmtUser = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
     $stmtUser->execute([$userId]);

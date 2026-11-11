@@ -141,7 +141,7 @@ function buildUrl($newPage, $currentParams) {
 
         <!-- === САЙДБАР === -->
         <div class="col-lg-3">
-            <div class="sticky-top" style="top: 100px;">
+            <div class="sticky-lg-top" style="top: 100px;">
 
                 <button class="btn btn-warning w-100 d-lg-none mb-4 rounded-0 fw-bold border-3 border-dark text-dark street-font shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                     <i class="bi bi-funnel-fill"></i> ФИЛЬТРЫ
@@ -151,7 +151,7 @@ function buildUrl($newPage, $currentParams) {
 
                     <?php if ($isSale): ?>
                         <div class="mb-4">
-                            <a href="catalog.php" class="btn btn-danger w-100 rounded-0 fw-black border-2 border-dark shadow-sm street-font">
+                            <a href="/pages/catalog.php" class="btn btn-danger w-100 rounded-0 fw-black border-2 border-dark shadow-sm street-font">
                                 <i class="bi bi-x-lg"></i> ВЕСЬ КАТАЛОГ
                             </a>
                         </div>
@@ -173,13 +173,13 @@ function buildUrl($newPage, $currentParams) {
                     <div class="mb-5">
                         <h5 class="street-font border-bottom border-4 border-dark pb-2 mb-3">Категории</h5>
                         <div class="list-group list-group-flush border-top border-dark">
-                            <a href="catalog.php<?= $isSale ? '?sale=1' : '' ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 border-bottom border-dark <?= !$catId ? 'bg-warning text-dark' : 'bg-transparent' ?>">
+                            <a href="/pages/catalog.php<?= $isSale ? '?sale=1' : '' ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 border-bottom border-dark <?= !$catId ? 'bg-warning text-dark' : 'bg-transparent' ?>">
                                 ВСЕ ТОВАРЫ <i class="bi bi-arrow-right"></i>
                             </a>
 
                             <?php foreach ($cats as $c): ?>
                                 <?php
-                                    $link = "catalog.php?cat=" . (int)$c['id'];
+                                    $link = "/pages/catalog.php?cat=" . (int)$c['id'];
                                     if ($isSale) $link .= "&sale=1";
                                     if ($search !== '') $link .= "&q=" . urlencode($search);
                                     $isActive = ($catId == $c['id']);
@@ -212,7 +212,7 @@ function buildUrl($newPage, $currentParams) {
                     <div class="card bg-black text-white rounded-0 border-0 p-4 text-center mt-5 shadow-lg d-none d-lg-block border border-warning">
                         <h3 class="street-font text-warning">SALE -50%</h3>
                         <p class="small fw-bold mb-3">УСПЕЙ ЗАБРАТЬ СВОЁ</p>
-                        <a href="catalog.php?sale=1" class="btn btn-outline-light rounded-0 fw-black border-2 w-100 street-font">СМОТРЕТЬ</a>
+                        <a href="/pages/catalog.php?sale=1" class="btn btn-outline-light rounded-0 fw-black border-2 w-100 street-font">СМОТРЕТЬ</a>
                     </div>
                     <?php endif; ?>
 
@@ -234,7 +234,7 @@ function buildUrl($newPage, $currentParams) {
                         <i class="bi bi-emoji-dizzy display-1 text-muted mb-3 d-block"></i>
                         <h2 class="street-font text-dark">ПУСТО</h2>
                         <p class="fw-bold text-muted mb-4">По заданным критериям ничего не найдено.</p>
-                        <a href="catalog.php" class="btn btn-black rounded-0 fw-black px-4 py-3 text-uppercase street-font border-2 border-dark">Сбросить фильтры</a>
+                        <a href="/pages/catalog.php" class="btn btn-black rounded-0 fw-black px-4 py-3 text-uppercase street-font border-2 border-dark">Сбросить фильтры</a>
                     </div>
                 <?php else: ?>
                     <?php foreach ($products as $p): ?>
@@ -251,9 +251,15 @@ function buildUrl($newPage, $currentParams) {
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="overflow-hidden border-bottom border-3 border-dark position-relative group">
-                                    <a href="/pages/product.php?id=<?= (int)$p['id'] ?>">
-                                        <img src="<?= e($imgSrc) ?>" class="card-img-top rounded-0 image-hover" alt="<?= e($p['title']) ?>" style="height: 320px; object-fit: cover;">
+                                <div class="overflow-hidden border-bottom border-3 border-dark position-relative">
+                                    <a href="/pages/product.php?id=<?= (int)$p['id'] ?>" class="d-block">
+                                        <?php if ($imgSrc !== ''): ?>
+                                            <img src="<?= e($imgSrc) ?>" class="card-img-top rounded-0 image-hover" alt="<?= e($p['title']) ?>" style="height: 320px; object-fit: cover;">
+                                        <?php else: ?>
+                                            <div class="d-flex align-items-center justify-content-center bg-light text-dark" style="height: 320px;">
+                                                <i class="bi bi-image display-4 opacity-50" aria-hidden="true"></i>
+                                            </div>
+                                        <?php endif; ?>
                                     </a>
 
                                     <div class="position-absolute bottom-0 start-0 w-100 p-2 add-cart-overlay d-none d-md-block">

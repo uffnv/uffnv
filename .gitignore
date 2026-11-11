@@ -12,10 +12,13 @@ uffnv-main.zip
 *.sql
 *.sql.gz
 
-# Logs & temp
+# Logs & temp & isolated sessions
 *.log
 /logs/
 /temp/
+/storage/sessions/*
+!/storage/sessions/.htaccess
+!/storage/sessions/.gitkeep
 
 # OS and IDE files
 .DS_Store

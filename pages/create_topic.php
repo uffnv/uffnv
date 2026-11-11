@@ -12,6 +12,11 @@ if ($forumBan) {
     redirectWithFlash('/pages/topics_list.php', 'Доступ к созданию тем ограничен' . $until . '.', 'danger');
 }
 
+$oldTopic = $_SESSION['old'] ?? [];
+unset($_SESSION['old']);
+$oldCatId = (int)($oldTopic['category_id'] ?? 0);
+$oldCatTitle = '';
+
 require_once __DIR__ . '/../includes/header.php';
 
 // 1. Получаем категории, СГРУППИРОВАННЫЕ по Разделам
@@ -28,6 +33,9 @@ $groupedCats = [];
 foreach ($rawCats as $cat) {
     $secTitle = $cat['section_title'] ?? 'Без раздела';
     $groupedCats[$secTitle][] = $cat;
+    if ((int)$cat['id'] === $oldCatId) {
+        $oldCatTitle = $cat['title'];
+    }
 }
 ?>
 
@@ -189,24 +197,29 @@ foreach ($rawCats as $cat) {
 
                                 <!-- Выбор категории -->
                                 <div class="mb-4">
-                                    <label for="categorySelectBtn" class="street-font small text-muted mb-2">Раздел форума</label>
-                                    <input type="hidden" name="category_id" id="selectedCategoryId">
+                                    <div class="street-font small text-muted mb-2">Раздел форума</div>
+                                    <input type="hidden" name="category_id" id="selectedCategoryId" value="<?= $oldCatId > 0 ? $oldCatId : '' ?>">
 
-                                    <button type="button" class="btn btn-select-cat w-100 rounded-0 py-3 px-3 d-flex justify-content-between align-items-center fw-bold fs-5"
+                                    <button type="button" class="btn btn-select-cat w-100 rounded-0 py-3 px-3 d-flex justify-content-between align-items-center fw-bold fs-5 <?= $oldCatTitle !== '' ? 'selected' : '' ?>"
                                             data-bs-toggle="modal" data-bs-target="#categoryModal" id="categorySelectBtn">
-                                        <span class="text-muted"><i class="bi bi-grid me-2"></i> Выберите раздел...</span>
-                                        <i class="bi bi-chevron-down"></i>
+                                        <?php if ($oldCatTitle !== ''): ?>
+                                            <span class="text-dark"><i class="bi bi-check-circle-fill me-2 text-success"></i><?= e($oldCatTitle) ?></span>
+                                            <span class="badge bg-black text-warning rounded-0 border border-dark">Изменить</span>
+                                        <?php else: ?>
+                                            <span class="text-muted"><i class="bi bi-grid me-2"></i> Выберите раздел...</span>
+                                            <i class="bi bi-chevron-down"></i>
+                                        <?php endif; ?>
                                     </button>
                                 </div>
 
                                 <div class="mb-4">
                                     <label for="topicTitleInput" class="street-font small text-muted mb-2">Заголовок</label>
-                                    <input type="text" id="topicTitleInput" name="title" class="form-control form-control-lg rounded-0" placeholder="О чем речь?" maxlength="200" required>
+                                    <input type="text" id="topicTitleInput" name="title" class="form-control form-control-lg rounded-0" placeholder="О чем речь?" minlength="3" maxlength="200" value="<?= e($oldTopic['title'] ?? '') ?>" required>
                                 </div>
 
                                 <div class="mb-5">
                                     <label for="topicContentInput" class="street-font small text-muted mb-2">Суть вопроса</label>
-                                    <textarea id="topicContentInput" name="content" class="form-control rounded-0" rows="6" placeholder="Распиши подробно..." required></textarea>
+                                    <textarea id="topicContentInput" name="content" class="form-control rounded-0" rows="6" placeholder="Распиши подробно..." required><?= e($oldTopic['content'] ?? '') ?></textarea>
                                 </div>
 
                                 <button type="submit" class="btn btn-black w-100 rounded-0 text-uppercase py-3 fs-4 shadow-sm">
@@ -258,7 +271,7 @@ foreach ($rawCats as $cat) {
                 <h5 class="modal-title street-font">Выберите раздел</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
-            <div class="modal-header bg-light border-bottom border-3 border-dark p-3">
+            <div class="bg-light border-bottom border-3 border-dark p-3">
                 <input type="text" id="catSearchInput" class="form-control rounded-0 border-2 border-dark fw-bold" placeholder="Поиск раздела..." aria-label="Поиск раздела">
             </div>
             <div class="modal-body p-0 bg-white">

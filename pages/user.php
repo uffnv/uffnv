@@ -100,10 +100,20 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="container py-5" style="position: relative; z-index: 2;">
     
+    <?php
+        $backHref = '/pages/topics_list.php';
+        if (!empty($_SERVER['HTTP_REFERER'])) {
+            $refHost = parse_url((string)$_SERVER['HTTP_REFERER'], PHP_URL_HOST);
+            $curHost = $_SERVER['HTTP_HOST'] ?? '';
+            if (!$refHost || ($curHost && strcasecmp($refHost, explode(':', $curHost)[0]) === 0)) {
+                $backHref = safeUrl((string)$_SERVER['HTTP_REFERER'], '/pages/topics_list.php');
+            }
+        }
+    ?>
     <!-- КНОПКА НАЗАД -->
     <div class="mb-4">
-        <a href="javascript:history.back()" class="text-decoration-none fw-bold text-light mb-2 d-inline-block hover-opacity small text-uppercase street-font">
-            <i class="bi bi-arrow-left"></i> Назад
+        <a href="<?= e($backHref) ?>" class="text-decoration-none fw-bold text-light mb-2 d-inline-block hover-opacity small text-uppercase street-font">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Назад
         </a>
     </div>
 

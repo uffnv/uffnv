@@ -20,6 +20,18 @@ $address         = trim($_POST['address'] ?? '');
 $consent         = isset($_POST['data_consent']) ? 1 : 0;
 $passwordConfirm = $_POST['password_confirm'] ?? '';
 
+if (mb_strlen($fullName, 'UTF-8') > 120 || mb_strlen($city, 'UTF-8') > 100 || mb_strlen($address, 'UTF-8') > 255) {
+    redirectWithFlash('/pages/profile.php', 'Превышена допустимая длина ФИО, города или адреса.', 'danger');
+}
+
+if ($phone !== '') {
+    $phoneCheck = normalizeAndValidatePhone($phone);
+    if (!$phoneCheck['valid']) {
+        redirectWithFlash('/pages/profile.php', $phoneCheck['error'], 'danger');
+    }
+    $phone = $phoneCheck['value'];
+}
+
 if ($passwordConfirm === '') {
     redirectWithFlash('/pages/profile.php', 'Введите текущий пароль для подтверждения изменений.', 'danger');
 }

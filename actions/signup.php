@@ -25,11 +25,16 @@ if (mb_strlen($username, 'UTF-8') < 3 || mb_strlen($username, 'UTF-8') > 30) {
     $errors['username'] = "Никнейм может содержать только буквы, цифры, _, - и .";
 }
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $errors['email'] = "Некорректный Email";
+$emailCheck = validateEmailStrict($email);
+if (!$emailCheck['valid']) {
+    $errors['email'] = $emailCheck['error'];
+} else {
+    $email = $emailCheck['value'];
 }
-if (mb_strlen($password, 'UTF-8') < 6) {
-    $errors['password'] = "Пароль должен быть не менее 6 символов";
+if (mb_strlen($password, 'UTF-8') < 6 || mb_strlen($password, 'UTF-8') > 64) {
+    $errors['password'] = "Пароль должен быть от 6 до 64 символов";
+} elseif (!preg_match('/^[\x21-\x7E]+$/', $password) || !preg_match('/[A-Za-z]/', $password) || !preg_match('/\d/', $password)) {
+    $errors['password'] = "Пароль: латинские буквы и минимум 1 цифра, без пробелов и кириллицы";
 }
 if ($password !== $confirm) {
     $errors['password_confirm'] = "Пароли не совпадают";
@@ -61,7 +66,7 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$username, $email, $hash, $role, $consent]);
 
-    regenerateAppSession();
+    regenerateAppSession($pdo);
     $_SESSION['user_id'] = (int)$pdo->lastInsertId();
     $_SESSION['username'] = $username;
     $_SESSION['role'] = $role;
@@ -71,7 +76,7 @@ try {
     exit;
 } catch (\PDOException $e) {
     error_log("Signup error: " . $e->getMessage());
-    $_SESSION['errors']['auth_failed'] = "Ошибка базы данных. Попробуйте позже.";
+    $_SESSION['errors']['general'] = "Ошибка базы данных. Попробуйте позже.";
     $_SESSION['old'] = ['username' => $username, 'email' => $email];
     header("Location: /pages/register.php");
     exit;

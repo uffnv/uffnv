@@ -71,8 +71,7 @@ try {
     $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$targetId]);
 
     if ($isSelfDelete) {
-        $_SESSION = [];
-        session_destroy();
+        destroySessionAndCookie();
         header("Location: /");
         exit;
     }

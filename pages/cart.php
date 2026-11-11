@@ -114,7 +114,7 @@ foreach ($cartItems as $item) {
     </div>
 
     <?php if(empty($cartItems)): ?>
-        <div class="text-center py-5 bg-white border-4 border-dark shadow-lg cart-card p-5" style="max-width: 600px; margin: 0 auto; transform: rotate(-1deg);">
+        <div class="text-center py-5 bg-white border-4 border-dark shadow-lg cart-card empty-cart-card p-4 p-md-5" style="max-width: 600px; margin: 0 auto;">
             <i class="bi bi-cart-x display-1 text-muted mb-3 d-block"></i>
             <h3 class="street-font text-dark mb-3">Здесь пусто</h3>
             <p class="text-dark fw-bold mb-4 fs-5">Ты еще не выбрал ни одной шмотки.</p>
@@ -128,15 +128,22 @@ foreach ($cartItems as $item) {
             <!-- СПИСОК ТОВАРОВ -->
             <div class="col-lg-8">
                 <?php foreach($cartItems as $item): ?>
-                    <div class="card mb-4 rounded-0 cart-card border-0">
+                    <?php $cartImg = safeUrl($item['image'] ?? '', ''); ?>
+                    <div class="card mb-4 rounded-0 cart-card">
                         <div class="row g-0">
                             
                             <!-- ФОТО -->
                             <div class="col-4 col-md-3 border-end border-3 border-dark position-relative" style="max-width: 140px; height: 140px;">
                                 <a href="/pages/product.php?id=<?= (int)$item['product_id'] ?>" class="cart-img-wrapper h-100">
-                                    <img src="<?= e(safeUrl($item['image'] ?? '', '')) ?>"
-                                         class="w-100 h-100 object-fit-cover"
-                                         alt="<?= e($item['title']) ?>">
+                                    <?php if ($cartImg !== ''): ?>
+                                        <img src="<?= e($cartImg) ?>"
+                                             class="w-100 h-100 object-fit-cover"
+                                             alt="<?= e($item['title']) ?>">
+                                    <?php else: ?>
+                                        <span class="w-100 h-100 d-flex align-items-center justify-content-center bg-light text-dark">
+                                            <i class="bi bi-image fs-2 opacity-50" aria-hidden="true"></i>
+                                        </span>
+                                    <?php endif; ?>
                                 </a>
                             </div>
 
@@ -220,7 +227,7 @@ foreach ($cartItems as $item) {
 
             <!-- ИТОГ (САЙДБАР) -->
             <div class="col-lg-4">
-                <div class="card rounded-0 p-4 sticky-top checkout-card" style="top: 100px;">
+                <div class="card rounded-0 p-4 sticky-lg-top checkout-card" style="top: 100px;">
                     <h3 class="street-font mb-4 text-street-yellow border-bottom border-secondary pb-3">
                         <i class="bi bi-receipt me-2"></i>Чек
                     </h3>

@@ -114,9 +114,9 @@ if (!isset($curPage)) {
         <div>
             &copy; 2024 - <?= date('Y') ?> UFFNV STORE. MADE ON THE STREETS.
         </div>
-        <div class="small text-white-50">
-            <a href="/pages/privacy.php" class="text-white-50 text-decoration-none me-3">152-ФЗ Конфиденциальность</a>
-            <a href="/pages/terms.php" class="text-white-50 text-decoration-none">Публичная оферта</a>
+        <div class="small text-light opacity-75">
+            <a href="/pages/privacy.php" class="text-light opacity-75 text-decoration-none me-3">152-ФЗ Конфиденциальность</a>
+            <a href="/pages/terms.php" class="text-light opacity-75 text-decoration-none">Публичная оферта</a>
         </div>
     </div>
 </div>
@@ -127,7 +127,7 @@ if (!isset($curPage)) {
         <span class="badge bg-warning text-dark rounded-0 fw-black" style="font-size: 0.7rem;">152-ФЗ РФ</span>
         <span class="fw-bold text-uppercase small text-white">Файлы Cookie</span>
     </div>
-    <p class="small text-white-50 mb-3" style="font-size: 0.8rem; line-height: 1.4;">
+    <p class="small text-light opacity-75 mb-3" style="font-size: 0.8rem; line-height: 1.4;">
         Мы используем файлы cookie и локальные хранилища для корректной работы корзины, авторизации и аналитики сервиса в соответствии с
         <a href="/pages/privacy.php" target="_blank" rel="noopener noreferrer" class="text-warning text-decoration-underline fw-bold">Политикой конфиденциальности</a>.
     </p>
@@ -137,6 +137,7 @@ if (!isset($curPage)) {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/main.js?v=1"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

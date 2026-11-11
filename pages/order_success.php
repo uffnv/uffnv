@@ -94,7 +94,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-lg-8">
             
             <!-- Карточка успеха -->
-            <div class="card rounded-0 p-5 overflow-hidden success-card">
+            <div class="card rounded-0 p-3 p-md-5 overflow-hidden success-card">
                 
                 <!-- Декоративный паттерн внутри -->
                 <div class="position-absolute top-0 start-0 w-100 h-100" 

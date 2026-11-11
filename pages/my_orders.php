@@ -200,7 +200,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content rounded-0">
 
-            <div class="modal-header bg-black text-white border-bottom-0 py-3 border-bottom border-3 border-dark">
+            <div class="modal-header bg-black text-white py-3 border-bottom border-3 border-dark">
                 <h5 class="modal-title street-font text-uppercase">
                     Состав заказа <span class="text-street-yellow" id="modalOrderId">#0</span>
                 </h5>
@@ -270,6 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         img.alt = String(item.title || '');
                         img.className = 'w-100 h-100 object-fit-cover';
                         thumbBox.appendChild(img);
+                    } else {
+                        thumbBox.classList.add('d-flex', 'align-items-center', 'justify-content-center', 'bg-light');
+                        const icon = document.createElement('i');
+                        icon.className = 'bi bi-image fs-3 text-muted';
+                        icon.setAttribute('aria-hidden', 'true');
+                        thumbBox.appendChild(icon);
                     }
 
                     const info = document.createElement('div');

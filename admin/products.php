@@ -44,7 +44,7 @@ $prods = $pdo->query("SELECT p.*, c.title as cat_title FROM products p LEFT JOIN
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-black text-uppercase m-0">Товары (<?= count($prods) ?>)</h2>
-    <a href="product_edit.php" class="btn btn-warning btn-admin">+ ДОБАВИТЬ ТОВАР</a>
+    <a href="/admin/product_edit.php" class="btn btn-warning btn-admin">+ ДОБАВИТЬ ТОВАР</a>
 </div>
 
 <div class="card admin-card p-0">
@@ -87,7 +87,7 @@ $prods = $pdo->query("SELECT p.*, c.title as cat_title FROM products p LEFT JOIN
                             <?php endif; ?>
                         </td>
                         <td class="text-end pe-4">
-                            <a href="product_edit.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm btn-outline-dark rounded-0 me-1" aria-label="Редактировать <?= e($p['title']) ?>"><i class="bi bi-pencil-fill" aria-hidden="true"></i></a>
+                            <a href="/admin/product_edit.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm btn-outline-dark rounded-0 me-1" aria-label="Редактировать <?= e($p['title']) ?>"><i class="bi bi-pencil-fill" aria-hidden="true"></i></a>
                             <form method="POST" class="d-inline" onsubmit="return confirm('Удалить/скрыть этот товар?');">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">

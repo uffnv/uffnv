@@ -20,18 +20,55 @@ $comment = trim($_POST['comment'] ?? '');
 $payment = $_POST['payment_method'] ?? '';
 $consent = isset($_POST['checkout_pd_consent']) ? 1 : 0;
 
+$oldCheckout = [
+    'name'           => $name,
+    'phone'          => $phone,
+    'email'          => $email,
+    'city'           => $city,
+    'address'        => $address,
+    'comment'        => $comment,
+    'payment_method' => $payment,
+];
+
 if ($consent !== 1) {
+    $_SESSION['old'] = $oldCheckout;
     redirectWithFlash('/pages/checkout.php', 'Необходимо подтвердить согласие на обработку персональных данных.', 'danger');
 }
 
-$phoneDigits = preg_replace('/\D+/', '', $phone);
-if ($name === '' || mb_strlen($phoneDigits) < 10 || !filter_var($email, FILTER_VALIDATE_EMAIL) || $city === '' || $address === '') {
-    redirectWithFlash('/pages/checkout.php', 'Проверьте заполнение ФИО, телефона (10+ цифр), Email, города и адреса.', 'danger');
+if (mb_strlen($name, 'UTF-8') < 2 || mb_strlen($name, 'UTF-8') > 120) {
+    $_SESSION['old'] = $oldCheckout;
+    redirectWithFlash('/pages/checkout.php', 'Укажите корректное ФИО или псевдоним (от 2 до 120 символов).', 'danger');
 }
 
-if (!in_array($payment, ['card', 'cash'], true)) {
+$phoneCheck = normalizeAndValidatePhone($phone);
+if (!$phoneCheck['valid']) {
+    $_SESSION['old'] = $oldCheckout;
+    redirectWithFlash('/pages/checkout.php', $phoneCheck['error'], 'danger');
+}
+$phone = $phoneCheck['value'];
+
+$emailCheck = validateEmailStrict($email);
+if (!$emailCheck['valid']) {
+    $_SESSION['old'] = $oldCheckout;
+    redirectWithFlash('/pages/checkout.php', $emailCheck['error'], 'danger');
+}
+$email = $emailCheck['value'];
+
+if (mb_strlen($city, 'UTF-8') < 2 || mb_strlen($city, 'UTF-8') > 100 || mb_strlen($address, 'UTF-8') < 5 || mb_strlen($address, 'UTF-8') > 255) {
+    $_SESSION['old'] = $oldCheckout;
+    redirectWithFlash('/pages/checkout.php', 'Укажите корректный город и адрес доставки.', 'danger');
+}
+
+if (mb_strlen($comment, 'UTF-8') > 1000) {
+    $_SESSION['old'] = $oldCheckout;
+    redirectWithFlash('/pages/checkout.php', 'Комментарий к заказу слишком длинный (максимум 1000 символов).', 'danger');
+}
+
+if (!in_array($payment, ['card_online', 'card', 'cash'], true)) {
+    $_SESSION['old'] = $oldCheckout;
     redirectWithFlash('/pages/checkout.php', 'Выберите корректный способ оплаты.', 'danger');
 }
+unset($_SESSION['old']);
 
 $fullAddress = $city . ', ' . $address;
 $sessId = session_id();

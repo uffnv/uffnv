@@ -174,7 +174,7 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 
     <!-- КАРТА И ПРЯМАЯ СВЯЗЬ -->
-    <div class="row g-0 border-3 border-white shadow-lg" style="box-shadow: 10px 10px 0 #000;">
+    <div class="row g-0 border border-3 border-white shadow-lg" style="box-shadow: 10px 10px 0 #000;">
 
         <!-- КАРТА -->
         <div class="col-lg-6">
@@ -189,7 +189,7 @@ require_once __DIR__ . '/../includes/header.php';
 
         <!-- ПРЯМЫЕ КАНАЛЫ СВЯЗИ -->
         <div class="col-lg-6">
-            <div class="bg-white p-5 h-100 d-flex flex-column justify-content-center border-3 border-dark border-lg-start-0">
+            <div class="bg-white p-4 p-md-5 h-100 d-flex flex-column justify-content-center border border-3 border-dark">
                 <h3 class="street-font mb-3 text-dark text-uppercase border-bottom border-4 border-dark pb-2 d-inline-block">Связаться со штабом</h3>
                 <p class="fw-bold text-dark mb-4">
                     По вопросам заказов, возвратов и сотрудничества пишите на официальную почту или создайте тему в комьюнити.

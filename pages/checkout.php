@@ -33,7 +33,19 @@ if (isset($_SESSION['user_id'])) {
     $user = $uStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 }
 
-$defaultName = !empty($user['full_name']) ? $user['full_name'] : ($user['username'] ?? '');
+$oldCheckout = $_SESSION['old'] ?? [];
+unset($_SESSION['old']);
+
+$defaultName    = $oldCheckout['name'] ?? (!empty($user['full_name']) ? $user['full_name'] : ($user['username'] ?? ''));
+$defaultPhone   = $oldCheckout['phone'] ?? ($user['phone'] ?? '');
+$defaultEmail   = $oldCheckout['email'] ?? ($user['email'] ?? '');
+$defaultCity    = $oldCheckout['city'] ?? ($user['city'] ?? '');
+$defaultAddress = $oldCheckout['address'] ?? ($user['address'] ?? '');
+$defaultComment = $oldCheckout['comment'] ?? '';
+$defaultPayment = $oldCheckout['payment_method'] ?? 'card_online';
+if (!in_array($defaultPayment, ['card_online', 'card', 'cash'], true)) {
+    $defaultPayment = 'card_online';
+}
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -136,7 +148,14 @@ require_once __DIR__ . '/../includes/header.php';
         </h1>
     </div>
 
-    <form action="/actions/place_order.php" method="POST" class="needs-validation" id="checkoutForm">
+    <?php if (!empty($_SESSION['flash'])): ?>
+        <div class="alert alert-<?= e($_SESSION['flash_type'] ?? 'danger') ?> border-3 border-dark rounded-0 fw-bold mb-4 shadow-sm">
+            <?= e($_SESSION['flash']) ?>
+        </div>
+        <?php unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+    <?php endif; ?>
+
+    <form action="/actions/place_order.php" method="POST" class="needs-validation" id="checkoutForm" data-validate-form data-prevent-double-submit="1" novalidate>
         <?= csrfField() ?>
         <div class="row g-5">
 
@@ -155,14 +174,16 @@ require_once __DIR__ . '/../includes/header.php';
                                 <label for="checkoutName" class="form-label small">ФИО / Псевдоним</label>
                                 <input type="text" id="checkoutName" name="name" class="form-control form-control-lg"
                                        value="<?= e($defaultName) ?>"
-                                       required placeholder="Иван Иванов">
+                                       data-rule="required-text" data-min="2"
+                                       required maxlength="120" placeholder="Иван Иванов">
                             </div>
 
                             <!-- ТЕЛЕФОН -->
                             <div class="col-md-6">
                                 <label for="phoneInput" class="form-label small">Телефон</label>
                                 <input type="tel" name="phone" id="phoneInput" class="form-control form-control-lg"
-                                       value="<?= e($user['phone'] ?? '') ?>"
+                                       value="<?= e($defaultPhone) ?>"
+                                       data-rule="phone"
                                        required placeholder="+7 (999) 000-00-00">
                             </div>
 
@@ -170,8 +191,9 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="col-md-6">
                                 <label for="checkoutEmail" class="form-label small">Email</label>
                                 <input type="email" id="checkoutEmail" name="email" class="form-control form-control-lg"
-                                       value="<?= e($user['email'] ?? '') ?>"
-                                       required placeholder="mail@example.com">
+                                       value="<?= e($defaultEmail) ?>"
+                                       data-rule="email"
+                                       required maxlength="100" placeholder="mail@example.com">
                             </div>
                         </div>
                     </div>
@@ -188,22 +210,24 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="col-12">
                                 <label for="checkoutCity" class="form-label small">Город</label>
                                 <input type="text" id="checkoutCity" name="city" class="form-control form-control-lg"
-                                       value="<?= e($user['city'] ?? '') ?>"
-                                       required placeholder="Москва">
+                                       value="<?= e($defaultCity) ?>"
+                                       data-rule="required-text" data-min="2"
+                                       required maxlength="100" placeholder="Москва">
                             </div>
 
                             <!-- АДРЕС -->
                             <div class="col-12">
                                 <label for="checkoutAddress" class="form-label small">Адрес</label>
                                 <input type="text" id="checkoutAddress" name="address" class="form-control form-control-lg"
-                                       value="<?= e($user['address'] ?? '') ?>"
-                                       required placeholder="Ул. Пушкина, д. 10, кв. 5">
+                                       value="<?= e($defaultAddress) ?>"
+                                       data-rule="required-text" data-min="5"
+                                       required maxlength="255" placeholder="Ул. Пушкина, д. 10, кв. 5">
                             </div>
 
                             <!-- КОММЕНТАРИЙ -->
                             <div class="col-12">
                                 <label for="checkoutComment" class="form-label small">Комментарий</label>
-                                <textarea id="checkoutComment" name="comment" class="form-control" rows="3" placeholder="Код домофона, этаж, пожелания..."></textarea>
+                                <textarea id="checkoutComment" name="comment" class="form-control" rows="3" maxlength="1000" placeholder="Код домофона, этаж, пожелания..."><?= e($defaultComment) ?></textarea>
                             </div>
                         </div>
                     </div>
@@ -218,7 +242,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="d-grid gap-3">
 
                             <label class="payment-option position-relative">
-                                <input type="radio" name="payment_method" value="card_online" checked class="visually-hidden peer">
+                                <input type="radio" name="payment_method" value="card_online" <?= $defaultPayment !== 'cash' ? 'checked' : '' ?> class="visually-hidden peer">
                                 <div class="card-box p-3 d-flex align-items-center">
                                     <div class="check-circle me-3 rounded-circle border border-2 border-dark d-flex align-items-center justify-content-center bg-white" style="width: 24px; height: 24px;">
                                         <div class="dot bg-black rounded-circle" style="width: 12px; height: 12px; display: none;"></div>
@@ -232,7 +256,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </label>
 
                             <label class="payment-option position-relative">
-                                <input type="radio" name="payment_method" value="cash" class="visually-hidden peer">
+                                <input type="radio" name="payment_method" value="cash" <?= $defaultPayment === 'cash' ? 'checked' : '' ?> class="visually-hidden peer">
                                 <div class="card-box p-3 d-flex align-items-center">
                                     <div class="check-circle me-3 rounded-circle border border-2 border-dark d-flex align-items-center justify-content-center bg-white" style="width: 24px; height: 24px;">
                                         <div class="dot bg-black rounded-circle" style="width: 12px; height: 12px; display: none;"></div>
@@ -253,14 +277,20 @@ require_once __DIR__ . '/../includes/header.php';
 
             <!-- ПРАВАЯ КОЛОНКА: ИТОГ -->
             <div class="col-lg-5">
-                <div class="card rounded-0 p-4 shadow-lg sticky-top summary-card" style="top: 100px;">
+                <div class="card rounded-0 p-4 shadow-lg sticky-lg-top summary-card" style="top: 100px;">
                     <h3 class="street-font mb-4 text-street-yellow border-bottom border-secondary pb-3">Ваш заказ</h3>
 
                     <!-- Список товаров -->
                     <div class="order-list mb-4 pe-2" style="max-height: 300px; overflow-y: auto;">
-                        <?php foreach ($cartItems as $item): ?>
+                        <?php foreach ($cartItems as $item):
+                            $thumbUrl = safeUrl($item['image'] ?? '', '');
+                        ?>
                             <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-secondary">
-                                <img src="<?= e(safeUrl($item['image'] ?? '', '')) ?>" alt="<?= e($item['title']) ?>" class="rounded-0 border border-secondary me-3" width="60" height="60" style="object-fit: cover;">
+                                <?php if ($thumbUrl !== ''): ?>
+                                    <img src="<?= e($thumbUrl) ?>" alt="<?= e($item['title']) ?>" class="rounded-0 border border-secondary me-3 flex-shrink-0" width="60" height="60" style="object-fit: cover;">
+                                <?php else: ?>
+                                    <div class="border border-secondary me-3 bg-dark d-flex align-items-center justify-content-center flex-shrink-0 text-white-50" style="width: 60px; height: 60px;"><i class="bi bi-image" aria-hidden="true"></i></div>
+                                <?php endif; ?>
                                 <div class="flex-grow-1">
                                     <div class="street-font text-white small lh-sm mb-1">
                                         <?= e($item['title']) ?>

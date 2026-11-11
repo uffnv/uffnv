@@ -13,19 +13,15 @@ $csrfToken = getCsrfToken();
     <title>SUPER ADMIN PANEL — UFFNV</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/assets/css/style.css?v=4">
 
     <style>
-        body {
+        body.admin-body {
             font-family: 'Arial', sans-serif;
             background: #f4f4f4;
-            overflow-x: hidden;
-        }
-        .fw-black { font-weight: 900 !important; }
-        .street-font {
-            font-family: 'Arial Black', 'Impact', sans-serif;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            color: #000;
+            display: block;
+            overflow-x: clip;
         }
         .admin-sidebar {
             width: 280px;
@@ -38,10 +34,10 @@ $csrfToken = getCsrfToken();
             flex-shrink: 0;
         }
         .admin-sidebar a {
-            color: #ccc;
+            color: #e0e0e0;
             text-decoration: none;
             display: block;
-            padding: 15px;
+            padding: 13px 16px;
             border-bottom: 1px solid #333;
             font-weight: bold;
             transition: all 0.2s;
@@ -49,7 +45,7 @@ $csrfToken = getCsrfToken();
         .admin-sidebar a:hover, .admin-sidebar a.active {
             background: #FCE300;
             color: #000;
-            padding-left: 25px;
+            padding-left: 24px;
         }
         .admin-sidebar .brand {
             padding: 20px;
@@ -57,6 +53,11 @@ $csrfToken = getCsrfToken();
             color: #FCE300;
             border-bottom: 5px solid #FCE300;
             text-align: center;
+        }
+        .admin-sidebar-section {
+            font-size: 0.72rem;
+            letter-spacing: 1px;
+            color: #b8bec5;
         }
         .admin-card {
             border: 3px solid #000;
@@ -127,7 +128,7 @@ $csrfToken = getCsrfToken();
         }
     </style>
 </head>
-<body>
+<body class="admin-body">
 
 <div class="d-flex" style="min-height: 100vh;">
     <button type="button" class="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Открыть меню админки">
@@ -138,13 +139,17 @@ $csrfToken = getCsrfToken();
     <div class="admin-sidebar d-flex flex-column flex-shrink-0 p-0" id="adminSidebar">
         <div class="brand street-font">
             <i class="bi bi-shield-lock-fill" aria-hidden="true"></i> ADMIN
+            <div class="mt-2 d-flex justify-content-center align-items-center gap-2" style="font-size: 0.72rem; font-family: monospace;">
+                <span class="text-white-50">СЕССИЯ:</span>
+                <span class="badge bg-black border border-warning text-warning rounded-0 admin-session-timer">--:--</span>
+            </div>
         </div>
 
         <a href="/admin/index.php" class="<?= $curAdminPage === 'index.php' ? 'active' : '' ?>">
             <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i> Главная
         </a>
 
-        <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Форум</div>
+        <div class="text-uppercase fw-bold px-3 mt-4 mb-2 street-font admin-sidebar-section">Форум</div>
         <a href="/admin/forum_sections.php" class="<?= $curAdminPage === 'forum_sections.php' ? 'active' : '' ?>">
             <i class="bi bi-collection-fill me-2" aria-hidden="true"></i> Разделы
         </a>
@@ -155,7 +160,7 @@ $csrfToken = getCsrfToken();
             <i class="bi bi-chat-left-text-fill me-2" aria-hidden="true"></i> Темы
         </a>
 
-        <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Магазин</div>
+        <div class="text-uppercase fw-bold px-3 mt-4 mb-2 street-font admin-sidebar-section">Магазин</div>
         <a href="/admin/shop_categories.php" class="<?= $curAdminPage === 'shop_categories.php' ? 'active' : '' ?>">
             <i class="bi bi-tags-fill me-2" aria-hidden="true"></i> Категории товаров
         </a>
@@ -166,16 +171,21 @@ $csrfToken = getCsrfToken();
             <i class="bi bi-cart-check-fill me-2" aria-hidden="true"></i> Заказы
         </a>
 
-        <div class="text-uppercase small text-muted fw-bold px-3 mt-4 mb-2 street-font">Система</div>
+        <div class="text-uppercase fw-bold px-3 mt-4 mb-2 street-font admin-sidebar-section">Система</div>
         <a href="/admin/users.php" class="<?= in_array($curAdminPage, ['users.php', 'user_edit.php'], true) ? 'active' : '' ?>">
             <i class="bi bi-people-fill me-2" aria-hidden="true"></i> Пользователи
         </a>
-        <a href="/" class="mt-auto bg-dark text-white border-top border-secondary">
-            <i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i> На сайт
-        </a>
+        <div class="mt-auto border-top border-secondary">
+            <a href="/" class="bg-dark text-white">
+                <i class="bi bi-globe2 me-2" aria-hidden="true"></i> На сайт
+            </a>
+            <a href="/admin/logout.php" class="bg-danger text-white border-top border-dark">
+                <i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i> Выйти
+            </a>
+        </div>
     </div>
 
-    <div class="flex-grow-1 p-4 content-wrapper" style="max-height: 100vh; overflow-y: auto; width: 100%;">
+    <div class="flex-grow-1 p-3 p-md-4 content-wrapper" style="min-height: 100vh; min-width: 0;">
     <?php if (!empty($_SESSION['flash'])): ?>
         <div class="alert alert-<?= e($_SESSION['flash_type'] ?? 'info') ?> border-2 border-dark rounded-0 fw-bold alert-dismissible fade show" role="alert">
             <?= e($_SESSION['flash']) ?>

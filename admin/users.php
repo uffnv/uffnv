@@ -20,9 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $role = 'user';
         }
 
-        if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($rawPassword, 'UTF-8') < 6) {
-            redirectWithFlash('/admin/users.php', 'Проверьте никнейм, корректный email и пароль (минимум 6 символов).', 'danger');
+        $emailCheck = validateEmailStrict($email);
+        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username) || !$emailCheck['valid'] || mb_strlen($rawPassword, 'UTF-8') < 6 || mb_strlen($rawPassword, 'UTF-8') > 64) {
+            redirectWithFlash('/admin/users.php', 'Проверьте никнейм (3–30 символов: буквы, цифры, _ . -), email и пароль (6–64 символа).', 'danger');
         }
+        $email = $emailCheck['value'];
 
         $check = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1");
         $check->execute([$username, $email]);
@@ -60,13 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $role = $requestedRole;
         }
 
-        if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            redirectWithFlash('/admin/users.php', 'Некорректные никнейм или email.', 'danger');
+        $emailCheck = validateEmailStrict($email);
+        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username) || !$emailCheck['valid']) {
+            redirectWithFlash('/admin/users.php', 'Некорректные никнейм (3–30 символов: буквы, цифры, _ . -) или email.', 'danger');
         }
+        $email = $emailCheck['value'];
 
         if (!empty($_POST['new_password'])) {
-            if (mb_strlen($_POST['new_password'], 'UTF-8') < 6) {
-                redirectWithFlash('/admin/users.php', 'Новый пароль должен быть не менее 6 символов.', 'danger');
+            if (mb_strlen($_POST['new_password'], 'UTF-8') < 6 || mb_strlen($_POST['new_password'], 'UTF-8') > 64) {
+                redirectWithFlash('/admin/users.php', 'Новый пароль должен быть от 6 до 64 символов.', 'danger');
             }
             $sql = "UPDATE users SET username = ?, email = ?, role = ?, password_hash = ? WHERE id = ?";
             $params = [$username, $email, $role, password_hash($_POST['new_password'], PASSWORD_DEFAULT), $id];
@@ -142,7 +146,7 @@ $usersList = $stmt->fetchAll();
     <form class="d-flex gap-2" method="GET">
         <input type="text" name="q" class="form-control" placeholder="Поиск по нику или email..." value="<?= e($search) ?>">
         <button type="submit" class="btn btn-admin btn-admin-dark">Найти</button>
-        <?php if ($search !== ''): ?><a href="users.php" class="btn btn-outline-secondary rounded-0">Сброс</a><?php endif; ?>
+        <?php if ($search !== ''): ?><a href="/admin/users.php" class="btn btn-outline-secondary rounded-0">Сброс</a><?php endif; ?>
     </form>
 </div>
 
@@ -195,7 +199,7 @@ $usersList = $stmt->fetchAll();
                                     aria-label="Быстрое редактирование <?= e($u['username']) ?>">
                                 <i class="bi bi-pencil-square" aria-hidden="true"></i>
                             </button>
-                            <a href="user_edit.php?id=<?= (int)$u['id'] ?>" class="btn btn-sm btn-outline-dark rounded-0 me-1" title="Полная карточка" aria-label="Карточка <?= e($u['username']) ?>">
+                            <a href="/admin/user_edit.php?id=<?= (int)$u['id'] ?>" class="btn btn-sm btn-outline-dark rounded-0 me-1" title="Полная карточка" aria-label="Карточка <?= e($u['username']) ?>">
                                 <i class="bi bi-person-vcard" aria-hidden="true"></i>
                             </a>
                         <?php endif; ?>
@@ -243,20 +247,21 @@ $usersList = $stmt->fetchAll();
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
+                <?php $uid = (int)$u['id']; ?>
                 <form method="POST">
                     <?= csrfField() ?>
-                    <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+                    <input type="hidden" name="id" value="<?= $uid ?>">
                     <div class="mb-3">
-                        <label class="fw-bold small">Никнейм</label>
-                        <input type="text" name="username" class="form-control" value="<?= e($u['username']) ?>" required>
+                        <label for="editUsername<?= $uid ?>" class="fw-bold small">Никнейм</label>
+                        <input id="editUsername<?= $uid ?>" type="text" name="username" class="form-control" value="<?= e($u['username']) ?>" minlength="3" maxlength="30" required>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Email</label>
-                        <input type="email" name="email" class="form-control" value="<?= e($u['email']) ?>" required>
+                        <label for="editEmail<?= $uid ?>" class="fw-bold small">Email</label>
+                        <input id="editEmail<?= $uid ?>" type="email" name="email" class="form-control" value="<?= e($u['email']) ?>" maxlength="100" required>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Роль</label>
-                        <select name="role" class="form-select" <?= ((int)$u['id'] === $actorId) ? 'disabled' : '' ?>>
+                        <label for="editRole<?= $uid ?>" class="fw-bold small">Роль</label>
+                        <select id="editRole<?= $uid ?>" name="role" class="form-select" <?= ($uid === $actorId) ? 'disabled' : '' ?>>
                             <?php foreach ($allowedRoles as $rOpt): ?>
                                 <option value="<?= e($rOpt) ?>" <?= $u['role'] === $rOpt ? 'selected' : '' ?>><?= e($rOpt) ?></option>
                             <?php endforeach; ?>
@@ -266,8 +271,8 @@ $usersList = $stmt->fetchAll();
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small text-danger">Новый пароль (оставьте пустым, если не меняете)</label>
-                        <input type="password" name="new_password" class="form-control" placeholder="******" minlength="6">
+                        <label for="editPass<?= $uid ?>" class="fw-bold small text-danger">Новый пароль (оставьте пустым, если не меняете)</label>
+                        <input id="editPass<?= $uid ?>" type="password" name="new_password" class="form-control" placeholder="******" minlength="6" maxlength="64">
                     </div>
                     <button type="submit" name="update_user" value="1" class="btn btn-admin btn-admin-primary w-100">Сохранить изменения</button>
                 </form>
@@ -289,20 +294,20 @@ $usersList = $stmt->fetchAll();
                 <form method="POST">
                     <?= csrfField() ?>
                     <div class="mb-3">
-                        <label class="fw-bold small">Никнейм</label>
-                        <input type="text" name="username" class="form-control" required>
+                        <label for="createUsername" class="fw-bold small">Никнейм</label>
+                        <input id="createUsername" type="text" name="username" class="form-control" minlength="3" maxlength="30" required>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Email</label>
-                        <input type="email" name="email" class="form-control" required>
+                        <label for="createEmail" class="fw-bold small">Email</label>
+                        <input id="createEmail" type="email" name="email" class="form-control" maxlength="100" required>
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Пароль</label>
-                        <input type="password" name="password" class="form-control" required minlength="6">
+                        <label for="createPassword" class="fw-bold small">Пароль</label>
+                        <input id="createPassword" type="password" name="password" class="form-control" required minlength="6" maxlength="64">
                     </div>
                     <div class="mb-3">
-                        <label class="fw-bold small">Роль</label>
-                        <select name="role" class="form-select">
+                        <label for="createRole" class="fw-bold small">Роль</label>
+                        <select id="createRole" name="role" class="form-select">
                             <?php foreach ($allowedRoles as $rOpt): ?>
                                 <option value="<?= e($rOpt) ?>"><?= e($rOpt) ?></option>
                             <?php endforeach; ?>

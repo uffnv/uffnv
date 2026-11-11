@@ -37,7 +37,7 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
 ?>
 
 <div class="d-flex align-items-center mb-4">
-    <a href="orders.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад к заказам"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
+    <a href="/admin/orders.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад к заказам"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
     <h2 class="fw-black text-uppercase m-0">Заказ #<?= (int)$order['id'] ?></h2>
     <span class="badge bg-dark rounded-0 ms-3 fs-6"><?= e($order['status']) ?></span>
 </div>
@@ -70,8 +70,8 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
             <div class="mb-4"><strong>Адрес:</strong> <br><?= e($order['address']) ?></div>
 
             <?php if (!empty($order['comment'])): ?>
-                <div class="alert alert-warning border-2 border-dark rounded-0 fw-bold">
-                    <small class="text-uppercase text-muted d-block">Комментарий:</small>
+                <div class="alert alert-warning border-2 border-dark rounded-0 fw-bold text-dark">
+                    <small class="text-uppercase text-dark opacity-75 d-block">Комментарий:</small>
                     <?= e($order['comment']) ?>
                 </div>
             <?php endif; ?>
@@ -83,6 +83,7 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
             <div class="card-header bg-white fw-bold py-3 px-4 border-bottom border-dark">
                 СОСТАВ ЗАКАЗА
             </div>
+            <div class="table-responsive">
             <table class="table table-hover mb-0 align-middle">
                 <tbody>
                     <?php if (empty($items)): ?>
@@ -125,6 +126,7 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
                     </tr>
                 </tfoot>
             </table>
+            </div>
         </div>
     </div>
 </div>

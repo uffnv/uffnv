@@ -32,18 +32,20 @@ $supportsTopicBan = hasUserBansTopicColumn($pdo);
 if ($isModerator) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         requireCsrfOrRedirect('/pages/profile.php');
+        $nextMsg = '';
+        $nextErr = '';
 
         if (isset($_POST['approve_cat_id'])) {
             $pdo->prepare("UPDATE categories SET is_approved = 1 WHERE id = ?")->execute([(int)$_POST['approve_cat_id']]);
-            $modMessage = 'Раздел форума одобрен!';
+            $nextMsg = 'Раздел форума одобрен!';
         }
         if (isset($_POST['delete_cat_id'])) {
             $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([(int)$_POST['delete_cat_id']]);
-            $modMessage = 'Заявка на раздел удалена.';
+            $nextMsg = 'Заявка на раздел удалена.';
         }
         if (isset($_POST['approve_topic_id'])) {
             $pdo->prepare("UPDATE topics SET is_approved = 1 WHERE id = ?")->execute([(int)$_POST['approve_topic_id']]);
-            $modMessage = 'Тема опубликована!';
+            $nextMsg = 'Тема опубликована!';
         }
 
         // Банхаммер (ТОЛЬКО форум: общий или в конкретной теме; заказы в магазине не блокируются)
@@ -63,13 +65,13 @@ if ($isModerator) {
                 $victim = $findStmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$victim) {
-                    $modError = 'Пользователь не найден.';
+                    $nextErr = 'Пользователь не найден.';
                 } elseif ((int)$victim['id'] === (int)$user['id']) {
-                    $modError = 'Нельзя заблокировать самого себя!';
+                    $nextErr = 'Нельзя заблокировать самого себя!';
                 } elseif (!canManageTargetUser($user['role'], $victim['role'])) {
-                    $modError = 'Недостаточно прав для блокировки этого пользователя!';
+                    $nextErr = 'Недостаточно прав для блокировки этого пользователя!';
                 } elseif ($banTopicId !== null && !$supportsTopicBan) {
-                    $modError = 'Баны по отдельной теме станут доступны после SQL-миграции topic_id.';
+                    $nextErr = 'Баны по отдельной теме станут доступны после SQL-миграции topic_id.';
                 } else {
                     $expires_at = null;
                     if ($banUnit !== 'perm') {
@@ -91,9 +93,9 @@ if ($isModerator) {
                                 ->execute([(int)$victim['id'], $reason, (int)$user['id'], $expires_at]);
                         }
                         $scopeText = $banTopicId ? " в теме #{$banTopicId}" : ' на форуме';
-                        $modMessage = "Пользователь {$victim['username']} ограничен{$scopeText}.";
+                        $nextMsg = "Пользователь {$victim['username']} ограничен{$scopeText}.";
                     } catch (PDOException $e) {
-                        $modError = 'Ошибка записи ограничения в базу данных.';
+                        $nextErr = 'Ошибка записи ограничения в базу данных.';
                     }
                 }
             }
@@ -110,23 +112,42 @@ if ($isModerator) {
                 $bannedUser = $unbanStmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$bannedUser) {
-                    $modError = 'Пользователь не найден.';
+                    $nextErr = 'Пользователь не найден.';
                 } elseif (!canManageTargetUser($user['role'], $bannedUser['role'])) {
-                    $modError = 'Недостаточно прав для снятия ограничений с этого пользователя.';
+                    $nextErr = 'Недостаточно прав для снятия ограничений с этого пользователя.';
                 } else {
                     if ($unbanTopicId !== null && $supportsTopicBan) {
                         $pdo->prepare("DELETE FROM user_bans WHERE user_id = ? AND topic_id = ?")->execute([(int)$bannedUser['id'], $unbanTopicId]);
-                        $modMessage = "Ограничение в теме #{$unbanTopicId} для {$bannedUser['username']} снято.";
+                        $nextMsg = "Ограничение в теме #{$unbanTopicId} для {$bannedUser['username']} снято.";
                     } else {
                         $pdo->prepare("DELETE FROM user_bans WHERE user_id = ?")->execute([(int)$bannedUser['id']]);
                         if ($bannedUser['role'] === 'banned') {
                             $pdo->prepare("UPDATE users SET role = 'user' WHERE id = ?")->execute([(int)$bannedUser['id']]);
                         }
-                        $modMessage = "Все форумные ограничения с {$bannedUser['username']} сняты.";
+                        $nextMsg = "Все форумные ограничения с {$bannedUser['username']} сняты.";
                     }
                 }
             }
         }
+
+        if ($nextErr !== '') {
+            $_SESSION['mod_flash'] = $nextErr;
+            $_SESSION['mod_flash_type'] = 'danger';
+        } elseif ($nextMsg !== '') {
+            $_SESSION['mod_flash'] = $nextMsg;
+            $_SESSION['mod_flash_type'] = 'success';
+        }
+        header('Location: /pages/profile.php');
+        exit;
+    }
+
+    if (isset($_SESSION['mod_flash'])) {
+        if (($_SESSION['mod_flash_type'] ?? 'success') === 'danger') {
+            $modError = (string)$_SESSION['mod_flash'];
+        } else {
+            $modMessage = (string)$_SESSION['mod_flash'];
+        }
+        unset($_SESSION['mod_flash'], $_SESSION['mod_flash_type']);
     }
 
     try {
@@ -231,8 +252,9 @@ require_once __DIR__ . '/../includes/header.php';
         <?php
             $allowedFlashTypes = ['success', 'danger', 'warning', 'info', 'dark'];
             $fType = in_array($_SESSION['flash_type'] ?? 'info', $allowedFlashTypes, true) ? $_SESSION['flash_type'] : 'info';
+            $flashTextClass = in_array($fType, ['warning', 'info'], true) ? 'text-dark' : '';
         ?>
-        <div class="alert alert-<?= e($fType) ?> border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font text-dark">
+        <div class="alert alert-<?= e($fType) ?> border-3 border-dark rounded-0 fw-bold text-center mb-4 shadow-sm street-font <?= $flashTextClass ?>">
             <?= e($_SESSION['flash']); unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
         </div>
     <?php endif; ?>
@@ -357,33 +379,49 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="card-body bg-white p-3">
                                     <form method="POST">
                                         <?= csrfField() ?>
-                                        <div class="input-group flex-wrap">
-                                            <span class="input-group-text bg-danger text-white border-2 border-dark rounded-0 fw-bold street-font">БАН</span>
-                                            <input type="text" name="ban_user_input" class="form-control ban-input" placeholder="Ник или ID" aria-label="Ник или ID пользователя" required style="min-width: 120px;">
+                                        <div class="row g-2 align-items-stretch">
+                                            <div class="col-12 col-sm-6 col-xl">
+                                                <input type="text" name="ban_user_input" class="form-control ban-input h-100" placeholder="Ник или ID пользователя" aria-label="Ник или ID пользователя" required>
+                                            </div>
                                             <?php if ($supportsTopicBan): ?>
-                                                <input type="number" name="ban_topic_id" class="form-control ban-input text-center" placeholder="ID темы (опц.)" aria-label="ID темы (необязательно)" min="1" style="max-width: 130px;">
+                                                <div class="col-6 col-sm-3 col-xl-2">
+                                                    <input type="number" name="ban_topic_id" class="form-control ban-input text-center h-100" placeholder="ID темы" aria-label="ID темы (необязательно)" min="1">
+                                                </div>
                                             <?php endif; ?>
-                                            <input type="number" name="ban_amount" class="form-control ban-input text-center" value="1" min="1" aria-label="Срок" style="max-width: 80px;">
-                                            <select name="ban_unit" class="form-select ban-input" id="banUnitSelect" aria-label="Единица срока" style="max-width: 110px;">
-                                                <option value="days">Дней</option>
-                                                <option value="hours">Часов</option>
-                                                <option value="months">Месяцев</option>
-                                                <option value="perm">НАВСЕГДА</option>
-                                            </select>
-                                            <input type="text" name="ban_reason" class="form-control ban-input" placeholder="Причина..." aria-label="Причина" style="min-width: 150px;">
-                                            <button type="submit" class="btn btn-black rounded-0 street-font text-danger border-2 border-dark px-4" style="background: #000;">ВЫПОЛНИТЬ</button>
+                                            <div class="col-6 col-sm-3 col-xl-1">
+                                                <input type="number" name="ban_amount" class="form-control ban-input text-center h-100" value="1" min="1" aria-label="Срок">
+                                            </div>
+                                            <div class="col-6 col-sm-4 col-xl-2">
+                                                <select name="ban_unit" class="form-select ban-input h-100" id="banUnitSelect" aria-label="Единица срока">
+                                                    <option value="days">Дней</option>
+                                                    <option value="hours">Часов</option>
+                                                    <option value="months">Месяцев</option>
+                                                    <option value="perm">НАВСЕГДА</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-sm-8 col-xl-3">
+                                                <input type="text" name="ban_reason" class="form-control ban-input h-100" placeholder="Причина..." aria-label="Причина">
+                                            </div>
+                                            <div class="col-12 col-xl-auto d-grid">
+                                                <button type="submit" class="btn btn-danger rounded-0 street-font border-2 border-dark px-4 text-white">БАН</button>
+                                            </div>
                                         </div>
                                         <div class="form-text fw-bold text-muted mt-1">Ограничение действует только на форуме (пустой ID темы = весь форум); заказы в магазине не блокируются.</div>
                                     </form>
-                                    <form method="POST" class="mt-3">
+                                    <form method="POST" class="mt-3 pt-3 border-top border-dark">
                                         <?= csrfField() ?>
-                                        <div class="input-group flex-wrap">
-                                            <span class="input-group-text bg-success text-white border-2 border-dark rounded-0 fw-bold street-font">UNBAN</span>
-                                            <input type="text" name="unban_user_input" class="form-control ban-input" placeholder="Ник или ID для снятия бана" aria-label="Ник или ID для разбана" required>
+                                        <div class="row g-2 align-items-stretch">
+                                            <div class="col-12 col-sm-7 col-xl">
+                                                <input type="text" name="unban_user_input" class="form-control ban-input h-100" placeholder="Ник или ID для снятия бана" aria-label="Ник или ID для разбана" required>
+                                            </div>
                                             <?php if ($supportsTopicBan): ?>
-                                                <input type="number" name="unban_topic_id" class="form-control ban-input text-center" placeholder="ID темы (опц.)" aria-label="ID темы (необязательно)" min="1" style="max-width: 130px;">
+                                                <div class="col-6 col-sm-5 col-xl-2">
+                                                    <input type="number" name="unban_topic_id" class="form-control ban-input text-center h-100" placeholder="ID темы" aria-label="ID темы (необязательно)" min="1">
+                                                </div>
                                             <?php endif; ?>
-                                            <button type="submit" class="btn btn-outline-success rounded-0 street-font border-2 border-dark px-4">РАЗБАНИТЬ</button>
+                                            <div class="col-12 col-xl-auto d-grid">
+                                                <button type="submit" class="btn btn-success rounded-0 street-font border-2 border-dark px-4 text-white">РАЗБАНИТЬ</button>
+                                            </div>
                                         </div>
                                     </form>
                                 </div>

@@ -3,14 +3,26 @@
 
 /**
  * Инициализация защищённой PHP-сессии (вызывать до любого вывода HTML)
+ * На Jino CloudLinux изолирует storage/sessions (вместо системного /tmp) и учитывает HTTPS за Nginx-прокси.
  */
 function initAppSession(): void {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_SSL']) === 'on');
 
+    $sessPath = __DIR__ . '/../storage/sessions';
+    if (!is_dir($sessPath)) {
+        @mkdir($sessPath, 0700, true);
+    }
+    if (is_dir($sessPath) && is_writable($sessPath)) {
+        session_save_path($sessPath);
+    }
+
+    ini_set('session.gc_maxlifetime', '14400');
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     session_set_cookie_params([
@@ -25,11 +37,98 @@ function initAppSession(): void {
 }
 
 /**
- * Защита от Session Fixation при входе/регистрации
+ * Защита от Session Fixation при входе/регистрации с сохранением гостевой корзины в БД
  */
-function regenerateAppSession(): void {
+function regenerateAppSession(?PDO $pdo = null): void {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return;
+    }
+    $oldSid = session_id();
+    session_regenerate_id(true);
+    $newSid = session_id();
+
+    if ($pdo instanceof PDO && $oldSid !== '' && $newSid !== '' && $oldSid !== $newSid) {
+        try {
+            // Если под новым SID каким-то образом уже есть позиции — объединяем по product_id без конфликтов
+            $oldItemsStmt = $pdo->prepare("SELECT id, product_id, quantity FROM cart WHERE session_id = ?");
+            $oldItemsStmt->execute([$oldSid]);
+            $oldItems = $oldItemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($oldItems as $item) {
+                $check = $pdo->prepare("SELECT id FROM cart WHERE session_id = ? AND product_id = ? LIMIT 1");
+                $check->execute([$newSid, (int)$item['product_id']]);
+                $existingId = $check->fetchColumn();
+                if ($existingId) {
+                    $pdo->prepare("UPDATE cart SET quantity = quantity + ? WHERE id = ?")
+                        ->execute([(int)$item['quantity'], (int)$existingId]);
+                    $pdo->prepare("DELETE FROM cart WHERE id = ?")->execute([(int)$item['id']]);
+                } else {
+                    $pdo->prepare("UPDATE cart SET session_id = ? WHERE id = ?")
+                        ->execute([$newSid, (int)$item['id']]);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log("Cart migration on session regenerate error: " . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * Полное уничтожение текущей сессии и удаление cookie
+ */
+function destroySessionAndCookie(): void {
+    if (session_status() === PHP_SESSION_NONE) {
+        initAppSession();
+    }
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params['path'] ?? '/',
+            $params['domain'] ?? '',
+            (bool)($params['secure'] ?? false),
+            (bool)($params['httponly'] ?? true)
+        );
+    }
     if (session_status() === PHP_SESSION_ACTIVE) {
-        session_regenerate_id(true);
+        session_destroy();
+    }
+}
+
+/**
+ * Инициализация метаданных защищённой сессии администратора (таймауты + привязка UA)
+ */
+function initAdminSessionMetadata(): void {
+    $now = time();
+    $_SESSION['admin_last_activity'] = $now;
+    $_SESSION['admin_login_time'] = $now;
+    $_SESSION['admin_ua_hash'] = hash('sha256', $_SERVER['HTTP_USER_AGENT'] ?? '');
+}
+
+/**
+ * Актуализация роли и существования пользователя из БД (защита от сохранения прав при удалении/понижении)
+ */
+function syncSessionUserRole(PDO $pdo): bool {
+    if (empty($_SESSION['user_id'])) {
+        return false;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT id, username, `role`, data_consent FROM users WHERE id = ? LIMIT 1");
+        $stmt->execute([(int)$_SESSION['user_id']]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $_SESSION['username'] = $row['username'];
+        $_SESSION['role'] = $row['role'];
+        $_SESSION['data_consent'] = (int)$row['data_consent'];
+        return true;
+    } catch (\Throwable $e) {
+        error_log("syncSessionUserRole error: " . $e->getMessage());
+        return false;
     }
 }
 
@@ -423,4 +522,48 @@ function getCartCount(PDO $pdo): int {
     } catch (\Throwable $e) {
         return 0;
     }
+}
+
+/**
+ * Строгая валидация Email
+ */
+function validateEmailStrict($value): array {
+    $clean = strtolower(trim((string)$value));
+    if (strlen($clean) < 5 || strlen($clean) > 100) {
+        return ['valid' => false, 'value' => $clean, 'error' => 'Некорректная длина Email адреса.'];
+    }
+    if (!preg_match('/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/', $clean) || !filter_var($clean, FILTER_VALIDATE_EMAIL)) {
+        return ['valid' => false, 'value' => $clean, 'error' => 'Введите корректный Email латинскими буквами (например, name@example.ru).'];
+    }
+    return ['valid' => true, 'value' => $clean, 'error' => null];
+}
+
+/**
+ * Нормализация и строгая валидация телефона РФ: +7 (XXX) XXX-XX-XX
+ */
+function normalizeAndValidatePhone($value): array {
+    $digits = preg_replace('/\D/', '', (string)$value);
+    if (strlen($digits) === 10) {
+        $digits = '7' . $digits;
+    } elseif (strlen($digits) === 11 && $digits[0] === '8') {
+        $digits = '7' . substr($digits, 1);
+    }
+
+    if (!preg_match('/^7\d{10}$/', $digits)) {
+        return ['valid' => false, 'value' => (string)$value, 'error' => 'Введите 11 цифр российского номера в формате +7 (XXX) XXX-XX-XX.'];
+    }
+
+    $body = substr($digits, 1);
+    if (preg_match('/^(\d)\1{9}$/', $body)) {
+        return ['valid' => false, 'value' => (string)$value, 'error' => 'Укажите действующий номер телефона (повторяющиеся цифры не допускаются).'];
+    }
+
+    $formatted = sprintf(
+        '+7 (%s) %s-%s-%s',
+        substr($digits, 1, 3),
+        substr($digits, 4, 3),
+        substr($digits, 7, 2),
+        substr($digits, 9, 2)
+    );
+    return ['valid' => true, 'value' => $formatted, 'error' => null];
 }
