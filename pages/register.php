@@ -166,46 +166,70 @@ require_once __DIR__ . '/../includes/header.php';
                 <?= csrfField() ?>
 
                 <div class="mb-3">
-                    <label for="regUsername" class="street-label">Никнейм</label>
+                    <label for="regUsername" class="street-label">Никнейм *</label>
                     <input type="text" id="regUsername" name="username" required minlength="3" maxlength="30"
                            class="form-control street-input <?= isset($errors['username']) ? 'is-invalid' : '' ?>"
                            data-rule="username"
                            placeholder="Придумай имя"
+                           autocomplete="username"
                            value="<?= e($old['username'] ?? '') ?>">
+                    <span class="form-hint">3–30 символов: буквы, цифры, _ . - (без пробелов)</span>
+                    <div class="auth-field-error"></div>
                     <?php if (isset($errors['username'])): ?>
                         <div class="street-error"><?= e($errors['username']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-3">
-                    <label for="regEmail" class="street-label">Email</label>
+                    <label for="regEmail" class="street-label">Email *</label>
                     <input type="email" id="regEmail" name="email" required maxlength="100"
                            class="form-control street-input <?= isset($errors['email']) ? 'is-invalid' : '' ?>"
                            data-rule="email"
-                           placeholder="name@example.com"
+                           placeholder="name@example.ru"
+                           inputmode="email"
+                           autocomplete="email"
                            value="<?= e($old['email'] ?? '') ?>">
+                    <span class="form-hint">Латинские символы (используется для входа и чеков)</span>
+                    <div class="auth-field-error"></div>
                     <?php if (isset($errors['email'])): ?>
                         <div class="street-error"><?= e($errors['email']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-3">
-                    <label for="regPassword" class="street-label">Пароль</label>
-                    <input type="password" id="regPassword" name="password" required minlength="6" maxlength="64"
-                           class="form-control street-input <?= isset($errors['password']) ? 'is-invalid' : '' ?>"
-                           data-rule="password-register"
-                           placeholder="Минимум 6 символов (латиница + цифра)" autocomplete="new-password">
+                    <label for="regPassword" class="street-label">Пароль *</label>
+                    <div class="input-group">
+                        <input type="password" id="regPassword" name="password" required minlength="6" maxlength="64"
+                               class="form-control street-input <?= isset($errors['password']) ? 'is-invalid' : '' ?>"
+                               data-rule="password-register"
+                               placeholder="Минимум 6 символов" autocomplete="new-password">
+                        <button class="btn toggle-password-btn" type="button" data-target="regPassword" title="Показать пароль" aria-label="Показать пароль">
+                            <i class="bi bi-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="password-strength-track">
+                        <div class="password-strength-fill"></div>
+                    </div>
+                    <span class="password-strength-label">От 6 символов: латинская буква + цифра, без пробелов и кириллицы</span>
+                    <div class="auth-caps-hint"></div>
+                    <div class="auth-field-error"></div>
                     <?php if (isset($errors['password'])): ?>
                         <div class="street-error"><?= e($errors['password']) ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="mb-4">
-                    <label for="regPasswordConfirm" class="street-label">Подтверждение</label>
-                    <input type="password" id="regPasswordConfirm" name="password_confirm" required minlength="6" maxlength="64"
-                           class="form-control street-input <?= isset($errors['password_confirm']) ? 'is-invalid' : '' ?>"
-                           data-rule="password-confirm"
-                           placeholder="Повтори пароль" autocomplete="new-password">
+                    <label for="regPasswordConfirm" class="street-label">Подтверждение пароля *</label>
+                    <div class="input-group">
+                        <input type="password" id="regPasswordConfirm" name="password_confirm" required minlength="6" maxlength="64"
+                               class="form-control street-input <?= isset($errors['password_confirm']) ? 'is-invalid' : '' ?>"
+                               data-rule="password-confirm"
+                               placeholder="Повтори пароль" autocomplete="new-password">
+                        <button class="btn toggle-password-btn" type="button" data-target="regPasswordConfirm" title="Показать пароль" aria-label="Показать пароль">
+                            <i class="bi bi-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="auth-field-error"></div>
                     <?php if (isset($errors['password_confirm'])): ?>
                         <div class="street-error"><?= e($errors['password_confirm']) ?></div>
                     <?php endif; ?>
@@ -220,6 +244,7 @@ require_once __DIR__ . '/../includes/header.php';
                             и принимаю условия <a href="/pages/terms.php" target="_blank" class="text-dark text-decoration-underline fw-black">Пользовательского соглашения</a>.
                         </label>
                     </div>
+                    <div class="auth-field-error" data-consent-error></div>
                     <?php if (isset($errors['data_consent'])): ?>
                         <div class="street-error"><?= e($errors['data_consent']) ?></div>
                     <?php endif; ?>

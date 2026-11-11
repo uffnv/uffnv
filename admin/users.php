@@ -4,7 +4,8 @@ require_once __DIR__ . '/admin_auth.php';
 
 $actorRole = $_SESSION['role'] ?? 'admin';
 $actorId = (int)$_SESSION['user_id'];
-$allowedRoles = isSuperAdmin() ? ['user', 'admin', 'super_admin', 'banned'] : ['user', 'banned'];
+$createRoles = isSuperAdmin() ? ['user', 'admin', 'super_admin'] : ['user'];
+$editRoles   = isSuperAdmin() ? ['user', 'admin', 'super_admin'] : ['user'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrfOrRedirect('/admin/users.php');
@@ -13,16 +14,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['create_user'])) {
         $username = trim($_POST['username'] ?? '');
         $email = trim($_POST['email'] ?? '');
-        $rawPassword = $_POST['password'] ?? '';
+        $rawPassword = (string)($_POST['password'] ?? '');
         $role = $_POST['role'] ?? 'user';
 
-        if (!in_array($role, $allowedRoles, true)) {
+        if (!in_array($role, $createRoles, true)) {
             $role = 'user';
         }
 
         $emailCheck = validateEmailStrict($email);
-        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username) || !$emailCheck['valid'] || mb_strlen($rawPassword, 'UTF-8') < 6 || mb_strlen($rawPassword, 'UTF-8') > 64) {
-            redirectWithFlash('/admin/users.php', 'Проверьте никнейм (3–30 символов: буквы, цифры, _ . -), email и пароль (6–64 символа).', 'danger');
+        $passCheck  = validatePasswordRegistration($rawPassword);
+        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username)) {
+            redirectWithFlash('/admin/users.php', 'Никнейм должен содержать от 3 до 30 символов (буквы, цифры, _ . - без пробелов).', 'danger');
+        }
+        if (!$emailCheck['valid']) {
+            redirectWithFlash('/admin/users.php', $emailCheck['error'], 'danger');
+        }
+        if (!$passCheck['valid']) {
+            redirectWithFlash('/admin/users.php', $passCheck['error'], 'danger');
         }
         $email = $emailCheck['value'];
 
@@ -58,29 +66,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Роль: нельзя сменить себе или назначить выше своих прав
         $role = $target['role'];
-        if ($id !== $actorId && in_array($requestedRole, $allowedRoles, true)) {
+        if ($id !== $actorId && in_array($requestedRole, $editRoles, true)) {
             $role = $requestedRole;
         }
 
         $emailCheck = validateEmailStrict($email);
-        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username) || !$emailCheck['valid']) {
-            redirectWithFlash('/admin/users.php', 'Некорректные никнейм (3–30 символов: буквы, цифры, _ . -) или email.', 'danger');
+        if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $username)) {
+            redirectWithFlash('/admin/users.php', 'Некорректный никнейм (3–30 символов: буквы, цифры, _ . -).', 'danger');
+        }
+        if (!$emailCheck['valid']) {
+            redirectWithFlash('/admin/users.php', $emailCheck['error'], 'danger');
         }
         $email = $emailCheck['value'];
 
-        if (!empty($_POST['new_password'])) {
-            if (mb_strlen($_POST['new_password'], 'UTF-8') < 6 || mb_strlen($_POST['new_password'], 'UTF-8') > 64) {
-                redirectWithFlash('/admin/users.php', 'Новый пароль должен быть от 6 до 64 символов.', 'danger');
+        $newPassword = (string)($_POST['new_password'] ?? '');
+        if ($newPassword !== '') {
+            $passCheck = validatePasswordRegistration($newPassword);
+            if (!$passCheck['valid']) {
+                redirectWithFlash('/admin/users.php', $passCheck['error'], 'danger');
             }
             $sql = "UPDATE users SET username = ?, email = ?, role = ?, password_hash = ? WHERE id = ?";
-            $params = [$username, $email, $role, password_hash($_POST['new_password'], PASSWORD_DEFAULT), $id];
+            $params = [$username, $email, $role, password_hash($newPassword, PASSWORD_DEFAULT), $id];
         } else {
             $sql = "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?";
             $params = [$username, $email, $role, $id];
         }
 
-        $pdo->prepare($sql)->execute($params);
-        redirectWithFlash('/admin/users.php', 'Пользователь обновлён.', 'success');
+        try {
+            $pdo->prepare($sql)->execute($params);
+            redirectWithFlash('/admin/users.php', 'Пользователь обновлён.', 'success');
+        } catch (\PDOException $e) {
+            error_log('Admin user update error: ' . $e->getMessage());
+            redirectWithFlash('/admin/users.php', 'Ошибка обновления (возможно, ник или email уже занят).', 'danger');
+        }
     }
 
     // 3. Удаление пользователя
@@ -133,6 +151,22 @@ $offset = ($page - 1) * $perPage;
 $stmt = $pdo->prepare("SELECT * FROM users $where ORDER BY id DESC LIMIT " . (int)$perPage . " OFFSET " . (int)$offset);
 $stmt->execute($params);
 $usersList = $stmt->fetchAll();
+
+// Получаем активные форумные баны для отображаемой страницы пользователей
+$activeBanCounts = [];
+if (!empty($usersList)) {
+    $uIds = array_map(static fn($r) => (int)$r['id'], $usersList);
+    $placeholders = implode(',', array_fill(0, count($uIds), '?'));
+    try {
+        $banStmt = $pdo->prepare("SELECT user_id, COUNT(*) AS cnt FROM user_bans WHERE user_id IN ($placeholders) AND (expires_at IS NULL OR expires_at > NOW()) GROUP BY user_id");
+        $banStmt->execute($uIds);
+        foreach ($banStmt->fetchAll() as $br) {
+            $activeBanCounts[(int)$br['user_id']] = (int)$br['cnt'];
+        }
+    } catch (\Throwable $e) {
+        $activeBanCounts = [];
+    }
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -189,6 +223,9 @@ $usersList = $stmt->fetchAll();
                     <td><?= e($u['email']) ?></td>
                     <td>
                         <span class="badge <?= e($badgeClass) ?> rounded-0 text-uppercase"><?= e($u['role']) ?></span>
+                        <?php if (!empty($activeBanCounts[(int)$u['id']])): ?>
+                            <span class="badge bg-danger rounded-0 text-uppercase ms-1" title="Активных банов форума: <?= $activeBanCounts[(int)$u['id']] ?>">БАН ФОРУМА (<?= $activeBanCounts[(int)$u['id']] ?>)</span>
+                        <?php endif; ?>
                     </td>
                     <td class="small"><?= date('d.m.Y', strtotime($u['created_at'])) ?></td>
                     <td>
@@ -248,31 +285,37 @@ $usersList = $stmt->fetchAll();
             </div>
             <div class="modal-body">
                 <?php $uid = (int)$u['id']; ?>
-                <form method="POST">
+                <form method="POST" data-validate-form data-prevent-double-submit="1" novalidate>
                     <?= csrfField() ?>
                     <input type="hidden" name="id" value="<?= $uid ?>">
                     <div class="mb-3">
                         <label for="editUsername<?= $uid ?>" class="fw-bold small">Никнейм</label>
-                        <input id="editUsername<?= $uid ?>" type="text" name="username" class="form-control" value="<?= e($u['username']) ?>" minlength="3" maxlength="30" required>
+                        <input id="editUsername<?= $uid ?>" type="text" name="username" class="form-control" value="<?= e($u['username']) ?>" minlength="3" maxlength="30" required data-rule="username">
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="editEmail<?= $uid ?>" class="fw-bold small">Email</label>
-                        <input id="editEmail<?= $uid ?>" type="email" name="email" class="form-control" value="<?= e($u['email']) ?>" maxlength="100" required>
+                        <input id="editEmail<?= $uid ?>" type="email" name="email" class="form-control" value="<?= e($u['email']) ?>" maxlength="100" required data-rule="email">
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="editRole<?= $uid ?>" class="fw-bold small">Роль</label>
                         <select id="editRole<?= $uid ?>" name="role" class="form-select" <?= ($uid === $actorId) ? 'disabled' : '' ?>>
-                            <?php foreach ($allowedRoles as $rOpt): ?>
+                            <?php foreach ($editRoles as $rOpt): ?>
                                 <option value="<?= e($rOpt) ?>" <?= $u['role'] === $rOpt ? 'selected' : '' ?>><?= e($rOpt) ?></option>
                             <?php endforeach; ?>
-                            <?php if (!in_array($u['role'], $allowedRoles, true)): ?>
+                            <?php if (!in_array($u['role'], $editRoles, true)): ?>
                                 <option value="<?= e($u['role']) ?>" selected><?= e($u['role']) ?></option>
                             <?php endif; ?>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label for="editPass<?= $uid ?>" class="fw-bold small text-danger">Новый пароль (оставьте пустым, если не меняете)</label>
-                        <input id="editPass<?= $uid ?>" type="password" name="new_password" class="form-control" placeholder="******" minlength="6" maxlength="64">
+                        <div class="input-group">
+                            <input id="editPass<?= $uid ?>" type="password" name="new_password" class="form-control" placeholder="Минимум 6 символов (лат. + цифра)" minlength="6" maxlength="64" data-rule="password-optional">
+                            <button type="button" class="btn btn-outline-dark rounded-0 toggle-password-btn" data-target="editPass<?= $uid ?>" aria-label="Показать или скрыть пароль"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="auth-field-error"></div>
                     </div>
                     <button type="submit" name="update_user" value="1" class="btn btn-admin btn-admin-primary w-100">Сохранить изменения</button>
                 </form>
@@ -291,24 +334,32 @@ $usersList = $stmt->fetchAll();
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
-                <form method="POST">
+                <form method="POST" data-validate-form data-prevent-double-submit="1" novalidate>
                     <?= csrfField() ?>
                     <div class="mb-3">
                         <label for="createUsername" class="fw-bold small">Никнейм</label>
-                        <input id="createUsername" type="text" name="username" class="form-control" minlength="3" maxlength="30" required>
+                        <input id="createUsername" type="text" name="username" class="form-control" minlength="3" maxlength="30" required data-rule="username">
+                        <div class="form-text">3–30 символов: буквы, цифры, точки, дефисы</div>
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="createEmail" class="fw-bold small">Email</label>
-                        <input id="createEmail" type="email" name="email" class="form-control" maxlength="100" required>
+                        <input id="createEmail" type="email" name="email" class="form-control" maxlength="100" required data-rule="email">
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="createPassword" class="fw-bold small">Пароль</label>
-                        <input id="createPassword" type="password" name="password" class="form-control" required minlength="6" maxlength="64">
+                        <div class="input-group">
+                            <input id="createPassword" type="password" name="password" class="form-control" required minlength="6" maxlength="64" data-rule="password-register">
+                            <button type="button" class="btn btn-outline-dark rounded-0 toggle-password-btn" data-target="createPassword" aria-label="Показать или скрыть пароль"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="form-text">От 6 до 64 символов: минимум 1 латинская буква и 1 цифра</div>
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="createRole" class="fw-bold small">Роль</label>
                         <select id="createRole" name="role" class="form-select">
-                            <?php foreach ($allowedRoles as $rOpt): ?>
+                            <?php foreach ($createRoles as $rOpt): ?>
                                 <option value="<?= e($rOpt) ?>"><?= e($rOpt) ?></option>
                             <?php endforeach; ?>
                         </select>

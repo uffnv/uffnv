@@ -122,9 +122,9 @@ function syncSessionUserRole(PDO $pdo): bool {
         if (!$row) {
             return false;
         }
-        $_SESSION['username'] = $row['username'];
-        $_SESSION['role'] = $row['role'];
-        $_SESSION['data_consent'] = (int)$row['data_consent'];
+        $_SESSION['username'] = $row['username'] ?? ($_SESSION['username'] ?? '');
+        $_SESSION['role'] = $row['role'] ?? 'user';
+        $_SESSION['data_consent'] = (int)($row['data_consent'] ?? 0);
         return true;
     } catch (\Throwable $e) {
         error_log("syncSessionUserRole error: " . $e->getMessage());
@@ -525,6 +525,27 @@ function getCartCount(PDO $pdo): int {
 }
 
 /**
+ * Строгая валидация логина (никнейма) или Email при входе
+ */
+function validateLoginIdentifier($value): array {
+    $clean = trim((string)$value);
+    $len = mb_strlen($clean, 'UTF-8');
+    if ($len < 3 || $len > 100) {
+        return ['valid' => false, 'value' => $clean, 'error' => 'Логин или Email должен содержать от 3 до 100 символов.'];
+    }
+    if (preg_match('/\s/u', $clean)) {
+        return ['valid' => false, 'value' => $clean, 'error' => 'Логин и Email не должны содержать пробелов.'];
+    }
+    if (strpos($clean, '@') !== false) {
+        return validateEmailStrict($clean);
+    }
+    if (!preg_match('/^[a-zA-Zа-яА-ЯёЁ0-9_.-]{3,30}$/u', $clean)) {
+        return ['valid' => false, 'value' => $clean, 'error' => 'Никнейм может содержать только буквы, цифры и _ . - (3–30 символов).'];
+    }
+    return ['valid' => true, 'value' => $clean, 'error' => null];
+}
+
+/**
  * Строгая валидация Email
  */
 function validateEmailStrict($value): array {
@@ -536,6 +557,24 @@ function validateEmailStrict($value): array {
         return ['valid' => false, 'value' => $clean, 'error' => 'Введите корректный Email латинскими буквами (например, name@example.ru).'];
     }
     return ['valid' => true, 'value' => $clean, 'error' => null];
+}
+
+/**
+ * Строгая проверка пароля при регистрации (6–64 видимых ASCII символа: латиница + цифра, без кириллицы/пробелов)
+ */
+function validatePasswordRegistration($password): array {
+    $pass = (string)$password;
+    $len = strlen($pass);
+    if ($len < 6 || $len > 64) {
+        return ['valid' => false, 'error' => 'Пароль должен содержать от 6 до 64 символов.'];
+    }
+    if (!preg_match('/^[\x21-\x7E]+$/', $pass)) {
+        return ['valid' => false, 'error' => 'Пароль может содержать только латинские буквы, цифры и спецсимволы (без пробелов и кириллицы).'];
+    }
+    if (!preg_match('/[A-Za-z]/', $pass) || !preg_match('/\d/', $pass)) {
+        return ['valid' => false, 'error' => 'Пароль должен включать минимум одну латинскую букву и одну цифру.'];
+    }
+    return ['valid' => true, 'error' => null];
 }
 
 /**

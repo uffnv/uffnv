@@ -2,6 +2,7 @@
 </div> <!-- End Flex -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/main.js?v=2"></script>
 <script>
 (function() {
     const IDLE_LIMIT = <?= (int)(defined('ADMIN_SESSION_IDLE_LIMIT') ? ADMIN_SESSION_IDLE_LIMIT : 900) ?>;

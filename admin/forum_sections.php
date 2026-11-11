@@ -8,10 +8,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_section'])) {
         $title = trim($_POST['title'] ?? '');
         $sortOrder = (int)($_POST['sort_order'] ?? 0);
-        if ($title !== '') {
+        $len = mb_strlen($title, 'UTF-8');
+        if ($len >= 2 && $len <= 120) {
             $pdo->prepare("INSERT INTO sections (title, sort_order) VALUES (?, ?)")->execute([$title, $sortOrder]);
             redirectWithFlash('/admin/forum_sections.php', 'Раздел создан.', 'success');
         }
+        redirectWithFlash('/admin/forum_sections.php', 'Название раздела должно содержать от 2 до 120 символов.', 'danger');
     }
 
     if (isset($_POST['delete_section'])) {
@@ -27,17 +29,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
         $title = trim($_POST['title'] ?? '');
         $sortOrder = (int)($_POST['sort_order'] ?? 0);
-        if ($id > 0 && $title !== '') {
+        $len = mb_strlen($title, 'UTF-8');
+        if ($id > 0 && $len >= 2 && $len <= 120) {
             $pdo->prepare("UPDATE sections SET title = ?, sort_order = ? WHERE id = ?")->execute([$title, $sortOrder, $id]);
             redirectWithFlash('/admin/forum_sections.php', 'Раздел обновлён.', 'success');
         }
+        redirectWithFlash('/admin/forum_sections.php', 'Название раздела должно содержать от 2 до 120 символов.', 'danger');
     }
 
     redirectWithFlash('/admin/forum_sections.php', 'Проверьте название раздела.', 'danger');
 }
 
 require_once __DIR__ . '/layout_header.php';
-$sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetchAll();
+$sections = $pdo->query("SELECT s.*, (SELECT COUNT(*) FROM categories c WHERE c.section_id = s.id) AS cat_count FROM sections s ORDER BY s.sort_order ASC, s.id ASC")->fetchAll();
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -49,15 +53,16 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
         <div class="admin-card">
             <div class="admin-header">Создать раздел</div>
             <div class="p-3">
-                <form method="POST">
+                <form method="POST" data-validate-form data-prevent-double-submit="1" novalidate>
                     <?= csrfField() ?>
                     <div class="mb-3">
                         <label for="secTitle" class="fw-bold small">Название</label>
-                        <input id="secTitle" type="text" name="title" class="form-control" required>
+                        <input id="secTitle" type="text" name="title" class="form-control" required maxlength="120" data-rule="required-text" data-min="2" data-max="120">
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="mb-3">
                         <label for="secSort" class="fw-bold small">Порядок (сортировка)</label>
-                        <input id="secSort" type="number" name="sort_order" class="form-control" value="0">
+                        <input id="secSort" type="number" name="sort_order" class="form-control" value="0" min="-999" max="9999">
                     </div>
                     <button type="submit" name="add_section" value="1" class="btn btn-admin btn-admin-primary w-100">Добавить</button>
                 </form>
@@ -74,6 +79,7 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
                         <tr>
                             <th>ID</th>
                             <th>Название</th>
+                            <th>Категорий</th>
                             <th>Порядок</th>
                             <th>Действия</th>
                         </tr>
@@ -84,11 +90,15 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
                         ?>
                         <tr>
                             <td>#<?= (int)$s['id'] ?></td>
-                            <td><input form="<?= $fid ?>" type="text" name="title" class="form-control form-control-sm" value="<?= e($s['title']) ?>" required aria-label="Название раздела"></td>
-                            <td><input form="<?= $fid ?>" type="number" name="sort_order" class="form-control form-control-sm" value="<?= (int)$s['sort_order'] ?>" style="width: 70px;" aria-label="Порядок сортировки"></td>
+                            <td>
+                                <input form="<?= $fid ?>" type="text" name="title" class="form-control form-control-sm" value="<?= e($s['title']) ?>" required maxlength="120" data-rule="required-text" data-min="2" data-max="120" aria-label="Название раздела">
+                                <div class="auth-field-error"></div>
+                            </td>
+                            <td><span class="badge bg-dark rounded-0"><?= (int)$s['cat_count'] ?></span></td>
+                            <td><input form="<?= $fid ?>" type="number" name="sort_order" class="form-control form-control-sm" value="<?= (int)$s['sort_order'] ?>" min="-999" max="9999" style="width: 75px;" aria-label="Порядок сортировки"></td>
                             <td>
                                 <button form="<?= $fid ?>" type="submit" name="edit_section" value="1" class="btn btn-sm btn-admin btn-admin-dark" title="Сохранить" aria-label="Сохранить"><i class="bi bi-save" aria-hidden="true"></i></button>
-                                <button form="<?= $fid ?>" type="submit" name="delete_section" value="1" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить раздел?')" title="Удалить" aria-label="Удалить"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                <button form="<?= $fid ?>" type="submit" name="delete_section" value="1" data-skip-validate="1" class="btn btn-sm btn-admin btn-admin-danger" onclick="return confirm('Удалить раздел? Категории останутся без раздела.')" title="Удалить" aria-label="Удалить"><i class="bi bi-trash" aria-hidden="true"></i></button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -100,7 +110,7 @@ $sections = $pdo->query("SELECT * FROM sections ORDER BY sort_order ASC")->fetch
 </div>
 
 <?php foreach ($sections as $s): ?>
-    <form method="POST" id="secForm<?= (int)$s['id'] ?>" class="d-none">
+    <form method="POST" id="secForm<?= (int)$s['id'] ?>" class="d-none" data-validate-form novalidate>
         <?= csrfField() ?>
         <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
     </form>

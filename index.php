@@ -37,22 +37,28 @@ try {
     .header-hidden { transform: translateY(-100%); }
 
     /* === 2. ОБЩИЕ СТИЛИ (АДАПТИВНЫЕ ПРОПОРЦИИ) === */
-    /* Секции на весь экран с поддержкой мобильных и учётом хедера */
     .full-screen-section { 
         position: relative; 
         width: 100%; 
-        min-height: clamp(540px, 84vh, 820px);
-        min-height: clamp(540px, 84svh, 820px);
+        min-height: 100vh;
+        min-height: 100svh;
         display: flex; 
         align-items: center; 
         justify-content: center; 
         overflow: hidden; 
-        padding: 60px 0 80px; 
+        padding: 72px 0 84px; 
     }
     #section-hero {
         min-height: calc(100vh - var(--header-height, 74px));
         min-height: calc(100svh - var(--header-height, 74px));
         padding: 36px 0 84px;
+    }
+    .info-box.bg-white {
+        color: #000 !important;
+    }
+    .info-box.bg-white h2,
+    .info-box.bg-white h3 {
+        color: #000 !important;
     }
     .hero-mega-title {
         font-size: clamp(2.75rem, 7.2vw, 5.1rem);
@@ -197,12 +203,12 @@ try {
     <div class="section-content container">
         <div class="row align-items-center gy-4">
             <div class="col-lg-6 order-2 order-lg-1" data-aos="fade-right">
-                <div class="info-box border-4 border-dark shadow-lg bg-white p-4 p-md-5 text-center">
+                <div class="info-box border-4 border-dark shadow-lg bg-white text-dark p-4 p-md-5 text-center">
                     <div class="mb-4 d-flex justify-content-center gap-2 flex-wrap">
                         <span class="badge bg-black text-white px-3 py-1 street-font">PASHA_CASHEL</span>
                         <span class="badge bg-black text-white px-3 py-1 street-font">ZACHEM</span>
                     </div>
-                    <h2 class="display-3 street-font mb-4">Искусство<br>Протеста</h2>
+                    <h2 class="display-3 street-font text-dark mb-4">Искусство<br>Протеста</h2>
                     <p class="lead text-dark fw-bold mb-4" style="font-family: monospace; letter-spacing: -1px;">// CITY IS A CANVAS</p>
                     <p class="text-muted mb-4">Город говорит с теми, кто умеет читать стены. От теггинга до муралов — мы документируем уличный код твоего района.</p>
                     
@@ -279,12 +285,12 @@ try {
                                     <?= htmlspecialchars($topic['cat_title'] ?? 'Общее') ?>
                                 </span>
                             </div>
-                            <div class="card-body py-4 bg-light text-center">
-                                <h4 class="street-font mb-3 fs-5"><?= htmlspecialchars($topic['title']) ?></h4>
-                                <div class="text-muted small">Ответов: <?= $topic['replies_count'] ?></div>
+                            <div class="card-body py-4 bg-light text-center text-dark">
+                                <h4 class="street-font text-dark mb-3 fs-5"><?= htmlspecialchars($topic['title'] ?? '') ?></h4>
+                                <div class="text-secondary fw-bold small">Ответов: <?= (int)($topic['replies_count'] ?? 0) ?></div>
                             </div>
                             <div class="card-footer bg-white border-top border-dark p-3">
-                                <a href="/pages/topic.php?id=<?= $topic['id'] ?>" class="btn-street btn-street-sm text-center">ВРЫВАЙСЯ -></a>
+                                <a href="/pages/topic.php?id=<?= (int)$topic['id'] ?>" class="btn-street btn-street-sm text-center">ВРЫВАЙСЯ -></a>
                             </div>
                         </div>
                     </div>
@@ -335,7 +341,7 @@ try {
                 </div>
             </div>
             <div class="mt-5 pt-4">
-                <a href="/pages/register.php" class="btn-street w-100 py-3 fs-4 text-white shadow-sm" style="text-decoration:none;">ПРИСОЕДИНИТЬСЯ -></a>
+                <a href="/pages/register.php" class="btn-street w-100 py-3 fs-4 shadow-sm" style="text-decoration:none;">ПРИСОЕДИНИТЬСЯ -></a>
             </div>
         </div>
     </div>

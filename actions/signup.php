@@ -31,10 +31,9 @@ if (!$emailCheck['valid']) {
 } else {
     $email = $emailCheck['value'];
 }
-if (mb_strlen($password, 'UTF-8') < 6 || mb_strlen($password, 'UTF-8') > 64) {
-    $errors['password'] = "Пароль должен быть от 6 до 64 символов";
-} elseif (!preg_match('/^[\x21-\x7E]+$/', $password) || !preg_match('/[A-Za-z]/', $password) || !preg_match('/\d/', $password)) {
-    $errors['password'] = "Пароль: латинские буквы и минимум 1 цифра, без пробелов и кириллицы";
+$passCheck = validatePasswordRegistration($password);
+if (!$passCheck['valid']) {
+    $errors['password'] = $passCheck['error'];
 }
 if ($password !== $confirm) {
     $errors['password_confirm'] = "Пароли не совпадают";

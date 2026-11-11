@@ -138,26 +138,45 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <form action="/actions/signin.php" method="POST" data-validate-form data-auth-mode="login" novalidate>
+        <form action="/actions/signin.php" method="POST" data-validate-form data-auth-mode="login" data-prevent-double-submit="1" novalidate>
             <?= csrfField() ?>
             <div class="mb-4">
-                <label for="loginEmail" class="street-font small text-muted mb-2">Твой Email</label>
+                <label for="loginEmail" class="street-font small text-muted mb-2 d-block">Email или Никнейм</label>
                 <div class="input-group">
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
-                        <i class="bi bi-envelope-fill"></i>
+                        <i class="bi bi-person-fill" aria-hidden="true"></i>
                     </span>
-                    <input type="email" id="loginEmail" name="email" class="form-control form-control-lg rounded-0" placeholder="mail@example.com" value="<?= e($oldLogin['email'] ?? '') ?>" data-rule="email" required autocomplete="email">
+                    <input type="text" id="loginEmail" name="email" class="form-control form-control-lg rounded-0"
+                           placeholder="mail@example.com или никнейм"
+                           value="<?= e($oldLogin['email'] ?? '') ?>"
+                           data-rule="login-id"
+                           minlength="3"
+                           maxlength="100"
+                           required
+                           autocomplete="username">
                 </div>
+                <span class="form-hint">Введите Email (name@example.ru) или никнейм без пробелов</span>
+                <div class="auth-field-error"></div>
             </div>
 
-            <div class="mb-5">
-                <label for="loginPassword" class="street-font small text-muted mb-2">Пароль</label>
+            <div class="mb-4">
+                <label for="loginPassword" class="street-font small text-muted mb-2 d-block">Пароль</label>
                 <div class="input-group">
                     <span class="input-group-text bg-black text-white rounded-0 border-3 border-dark border-end-0">
-                        <i class="bi bi-lock-fill"></i>
+                        <i class="bi bi-lock-fill" aria-hidden="true"></i>
                     </span>
-                    <input type="password" id="loginPassword" name="password" class="form-control form-control-lg rounded-0" placeholder="••••••••" data-rule="password-login" required autocomplete="current-password">
+                    <input type="password" id="loginPassword" name="password" class="form-control form-control-lg rounded-0 border-end-0"
+                           placeholder="••••••••"
+                           maxlength="128"
+                           data-rule="password-login"
+                           required
+                           autocomplete="current-password">
+                    <button class="btn toggle-password-btn" type="button" data-target="loginPassword" title="Показать пароль" aria-label="Показать пароль">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </button>
                 </div>
+                <div class="auth-caps-hint"></div>
+                <div class="auth-field-error"></div>
             </div>
 
             <button type="submit" class="street-btn">

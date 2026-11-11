@@ -13,7 +13,7 @@ $csrfToken = getCsrfToken();
     <title>SUPER ADMIN PANEL — UFFNV</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/assets/css/style.css?v=4">
+    <link rel="stylesheet" href="/assets/css/style.css?v=5">
 
     <style>
         body.admin-body {
@@ -156,7 +156,7 @@ $csrfToken = getCsrfToken();
         <a href="/admin/forum_categories.php" class="<?= $curAdminPage === 'forum_categories.php' ? 'active' : '' ?>">
             <i class="bi bi-folder-fill me-2" aria-hidden="true"></i> Категории
         </a>
-        <a href="/admin/topics.php" class="<?= $curAdminPage === 'topics.php' ? 'active' : '' ?>">
+        <a href="/admin/topics.php" class="<?= in_array($curAdminPage, ['topics.php', 'topic_edit.php'], true) ? 'active' : '' ?>">
             <i class="bi bi-chat-left-text-fill me-2" aria-hidden="true"></i> Темы
         </a>
 

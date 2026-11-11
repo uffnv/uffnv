@@ -4,19 +4,38 @@ require_once __DIR__ . '/admin_auth.php';
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
-    header("Location: orders.php");
+    header("Location: /admin/orders.php");
     exit;
 }
 
 $allowedStatuses = ['new', 'processing', 'shipped', 'completed', 'cancelled'];
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrfOrRedirect('/admin/order_view.php?id=' . $id);
-    $newSt = $_POST['status'] ?? '';
-    if (in_array($newSt, $allowedStatuses, true)) {
-        $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$newSt, $id]);
-        redirectWithFlash('/admin/order_view.php?id=' . $id, 'Статус заказа обновлен.', 'success');
+
+    if (isset($_POST['delete_order'])) {
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM orders WHERE id = ?")->execute([$id]);
+            $pdo->commit();
+            redirectWithFlash('/admin/orders.php', 'Заказ #' . $id . ' удалён.', 'warning');
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Order delete error: ' . $e->getMessage());
+            redirectWithFlash('/admin/order_view.php?id=' . $id, 'Не удалось удалить заказ.', 'danger');
+        }
     }
-    redirectWithFlash('/admin/order_view.php?id=' . $id, 'Недопустимый статус.', 'danger');
+
+    if (isset($_POST['change_status'])) {
+        $newSt = $_POST['status'] ?? '';
+        if (in_array($newSt, $allowedStatuses, true)) {
+            $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$newSt, $id]);
+            redirectWithFlash('/admin/order_view.php?id=' . $id, 'Статус заказа обновлен.', 'success');
+        }
+        redirectWithFlash('/admin/order_view.php?id=' . $id, 'Недопустимый статус.', 'danger');
+    }
 }
 
 $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
@@ -46,7 +65,7 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
     <div class="col-lg-4 order-lg-2">
         <div class="card admin-card p-4 mb-4">
             <h5 class="fw-bold mb-3 border-bottom pb-2">Управление</h5>
-            <form method="POST">
+            <form method="POST" class="mb-3">
                 <?= csrfField() ?>
                 <label for="orderStatusSelect" class="small fw-bold text-muted mb-1">СМЕНИТЬ СТАТУС</label>
                 <div class="input-group">
@@ -60,10 +79,18 @@ $amount = $order['total_amount'] ?? ($order['total_price'] ?? 0);
                     <button type="submit" name="change_status" value="1" class="btn btn-warning btn-admin">OK</button>
                 </div>
             </form>
+            <form method="POST" onsubmit="return confirm('Удалить заказ #<?= (int)$order['id'] ?> и все его позиции навсегда?');">
+                <?= csrfField() ?>
+                <button type="submit" name="delete_order" value="1" class="btn btn-sm btn-outline-danger rounded-0 w-100 fw-bold">
+                    <i class="bi bi-trash me-1" aria-hidden="true"></i> Удалить заказ
+                </button>
+            </form>
         </div>
 
         <div class="card admin-card p-4">
             <h5 class="fw-bold mb-3 border-bottom pb-2">Клиент</h5>
+            <div class="mb-2"><strong>Дата:</strong> <?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></div>
+            <div class="mb-2"><strong>Оплата:</strong> <?= e($order['payment_method'] ?? 'Наличные / при получении') ?></div>
             <div class="mb-2"><strong>Имя:</strong> <?= e($order['name']) ?></div>
             <div class="mb-2"><strong>Телефон:</strong> <?= e($order['phone']) ?></div>
             <div class="mb-2"><strong>Email:</strong> <?= e($order['email']) ?></div>

@@ -11,19 +11,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 requireCsrfOrRedirect('/pages/login.php');
 
-$email = trim($_POST['email'] ?? '');
-$password = $_POST['password'] ?? '';
+$loginCheck = validateLoginIdentifier($_POST['email'] ?? '');
+$password   = (string)($_POST['password'] ?? '');
 
-if ($email === '' || $password === '') {
-    $_SESSION['error'] = "Введите email и пароль";
-    $_SESSION['old'] = ['email' => $email];
+if (!$loginCheck['valid']) {
+    $_SESSION['error'] = $loginCheck['error'];
+    $_SESSION['old'] = ['email' => $loginCheck['value']];
     header("Location: /pages/login.php");
     exit;
 }
 
+if (strlen($password) < 1 || strlen($password) > 128) {
+    $_SESSION['error'] = "Введите корректный пароль";
+    $_SESSION['old'] = ['email' => $loginCheck['value']];
+    header("Location: /pages/login.php");
+    exit;
+}
+
+$loginVal = $loginCheck['value'];
+
 try {
-    $stmt = $pdo->prepare("SELECT id, username, `role`, password_hash, data_consent FROM users WHERE email = ? LIMIT 1");
-    $stmt->execute([$email]);
+    if (strpos($loginVal, '@') !== false) {
+        $stmt = $pdo->prepare("SELECT id, username, `role`, password_hash, data_consent FROM users WHERE email = ? LIMIT 1");
+    } else {
+        $stmt = $pdo->prepare("SELECT id, username, `role`, password_hash, data_consent FROM users WHERE username = ? LIMIT 1");
+    }
+    $stmt->execute([$loginVal]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user && password_verify($password, $user['password_hash'])) {
@@ -47,8 +60,8 @@ try {
         exit;
     }
 
-    $_SESSION['error'] = "Неверный email или пароль";
-    $_SESSION['old'] = ['email' => $email];
+    $_SESSION['error'] = "Неверный логин/email или пароль";
+    $_SESSION['old'] = ['email' => $loginVal];
     header("Location: /pages/login.php");
     exit;
 } catch (\PDOException $e) {

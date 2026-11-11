@@ -100,28 +100,53 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-    .street-font {
-        font-family: 'Arial Black', 'Impact', sans-serif;
-        font-weight: 900;
-        text-transform: uppercase;
+    .topic-hero-title {
+        font-size: clamp(1.65rem, 5.5vw, 3.1rem);
+        line-height: 1.1;
         letter-spacing: 1px;
     }
-    .text-street-yellow { color: #FCE300; text-shadow: 2px 2px 0 #000; }
     .post-card {
         background: #fff;
         color: #000;
         border: 3px solid #000;
-        box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5);
+        box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.55);
     }
     .author-col {
         background: #f0f0f0;
     }
+    .avatar-link {
+        text-decoration: none !important;
+        display: inline-flex;
+        flex-shrink: 0;
+    }
     .avatar-img {
-        width: 100px;
-        height: 100px;
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
         object-fit: cover;
-        border: 3px solid #000;
+        border: 2px solid #000;
         background: #fff;
+    }
+    .post-message-body {
+        min-height: 68px;
+        color: #111;
+        font-size: 1.02rem;
+        line-height: 1.55;
+    }
+    @media (min-width: 768px) {
+        .post-card {
+            box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5);
+        }
+        .avatar-img {
+            width: 88px;
+            height: 88px;
+            font-size: 2rem;
+            border-width: 3px;
+        }
+        .post-message-body {
+            min-height: 120px;
+            font-size: 1.08rem;
+        }
     }
     .author-link { text-decoration: none; color: inherit; transition: color 0.2s; }
     .author-link:hover { color: #bc13fe; }
@@ -132,7 +157,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="bg-main-anim"></div>
 
-<div class="py-5 position-relative" style="z-index: 2;">
+<div class="py-3 py-md-5 position-relative" style="z-index: 2;">
     <div class="container">
 
         <?php if (!empty($_SESSION['flash'])): ?>
@@ -143,16 +168,16 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <!-- HEADER -->
-        <div class="mb-5 pb-3 border-bottom border-white border-2">
+        <div class="mb-4 mb-md-5 pb-3 border-bottom border-white border-2">
             <a href="/pages/topics_list.php" class="text-decoration-none fw-bold text-light mb-2 d-inline-block hover-opacity small text-uppercase street-font">
                 <i class="bi bi-arrow-left" aria-hidden="true"></i> Назад в форум
             </a>
 
-            <h1 class="display-4 street-font m-0 text-white text-break" style="letter-spacing: 1px;">
+            <h1 class="street-font m-0 text-white text-break topic-hero-title">
                 <?= e($topic['title']) ?>
             </h1>
 
-            <div class="mt-3">
+            <div class="mt-2 mt-md-3">
                 <span class="badge bg-black text-white border border-white rounded-0 fs-6 text-uppercase street-font">
                     <?= e($topic['cat_title'] ?? 'Без категории') ?>
                 </span>
@@ -170,34 +195,36 @@ require_once __DIR__ . '/../includes/header.php';
             $opAvatar = getAvatarUrl($topic['author_avatar'] ?? '');
             $opIsAdmin = in_array($topic['author_role'] ?? 'user', ['admin', 'super_admin'], true);
         ?>
-        <div class="card post-card rounded-0 mb-4 border-warning" style="border-width: 4px;" id="topic-op">
+        <div class="card post-card rounded-0 mb-3 mb-md-4 border-warning" style="border-width: 4px;" id="topic-op">
             <div class="row g-0">
-                <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark p-4 text-center d-flex flex-column align-items-center">
-                    <?php if (!empty($topic['user_id'])): ?>
-                        <a href="/pages/user.php?id=<?= (int)$topic['user_id'] ?>" title="Профиль автора">
-                    <?php endif; ?>
-                    <?php if ($opAvatar): ?>
-                        <img src="<?= e($opAvatar) ?>" alt="<?= e($opName) ?>" class="img-fluid rounded-circle avatar-img mb-3 shadow-sm">
-                    <?php else: ?>
-                        <div class="rounded-circle avatar-img mb-3 shadow-sm d-flex align-items-center justify-content-center bg-black text-warning fs-1 fw-black"><?= e(safeFirstChar($opName)) ?></div>
-                    <?php endif; ?>
-                    <?php if (!empty($topic['user_id'])): ?>
-                        </a>
-                    <?php endif; ?>
-
-                    <div class="street-font text-break lh-1 mb-1 fs-5">
+                <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark px-3 py-2 p-md-4 d-flex flex-row flex-md-column align-items-center justify-content-between justify-content-md-start gap-2 text-start text-md-center">
+                    <div class="d-flex flex-row flex-md-column align-items-center gap-2 min-w-0">
                         <?php if (!empty($topic['user_id'])): ?>
-                            <a href="/pages/user.php?id=<?= (int)$topic['user_id'] ?>" class="author-link"><?= e($opName) ?></a>
-                        <?php else: ?>
-                            <?= e($opName) ?>
+                            <a href="/pages/user.php?id=<?= (int)$topic['user_id'] ?>" class="avatar-link" title="Профиль автора">
                         <?php endif; ?>
+                        <?php if ($opAvatar): ?>
+                            <img src="<?= e($opAvatar) ?>" alt="<?= e($opName) ?>" class="rounded-circle avatar-img mb-md-2 shadow-sm">
+                        <?php else: ?>
+                            <div class="rounded-circle avatar-img mb-md-2 shadow-sm d-flex align-items-center justify-content-center bg-black text-warning fw-black"><?= e(safeFirstChar($opName)) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($topic['user_id'])): ?>
+                            </a>
+                        <?php endif; ?>
+
+                        <div class="street-font text-break lh-sm fs-6 fs-md-5">
+                            <?php if (!empty($topic['user_id'])): ?>
+                                <a href="/pages/user.php?id=<?= (int)$topic['user_id'] ?>" class="author-link"><?= e($opName) ?></a>
+                            <?php else: ?>
+                                <?= e($opName) ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <span class="badge <?= $opIsAdmin ? 'bg-danger' : 'bg-warning text-dark' ?> rounded-0 border border-dark mt-2 text-uppercase street-font">АВТОР ТЕМЫ</span>
+                    <span class="badge <?= $opIsAdmin ? 'bg-danger' : 'bg-warning text-dark' ?> rounded-0 border border-dark mt-md-2 text-uppercase street-font flex-shrink-0" style="font-size: 0.68rem;">АВТОР ТЕМЫ</span>
                 </div>
 
                 <div class="col-md-9 col-lg-10 d-flex flex-column bg-white">
                     <div class="p-2 px-3 border-bottom border-2 border-dark bg-warning bg-opacity-25 d-flex justify-content-between align-items-center">
-                        <small class="fw-bold text-dark text-uppercase street-font" style="font-size: 0.75rem;">
+                        <small class="fw-bold text-dark text-uppercase street-font" style="font-size: 0.72rem;">
                             <i class="bi bi-clock me-1" aria-hidden="true"></i> <?= date('d.m.Y в H:i', strtotime($topic['created_at'])) ?>
                         </small>
                         <?php if (!empty($_SESSION['user_id']) && !$currentForumBan && (int)$topic['is_approved'] === 1): ?>
@@ -209,7 +236,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
 
-                    <div class="p-4 flex-grow-1 fw-medium fs-5 text-break" style="min-height: 120px; color: #111;">
+                    <div class="p-3 p-md-4 flex-grow-1 fw-medium text-break post-message-body">
                         <?= nl2br(e($topic['content'])) ?>
                     </div>
                 </div>
@@ -218,43 +245,45 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <!-- ЛЕНТА СООБЩЕНИЙ -->
-        <div class="d-flex flex-column gap-4">
+        <div class="d-flex flex-column gap-3 gap-md-4">
             <?php foreach ($posts as $post):
                 $postName = $post['username'] ?? 'Удалён';
                 $avatar = getAvatarUrl($post['avatar'] ?? '');
                 $postRole = $post['role'] ?? 'user';
                 $roleBadge = in_array($postRole, ['admin', 'super_admin'], true)
-                    ? '<span class="badge bg-danger rounded-0 border border-dark mt-2 text-uppercase street-font">ADMIN</span>'
-                    : '<span class="badge bg-white text-dark rounded-0 border border-dark mt-2 text-uppercase street-font">USER</span>';
+                    ? '<span class="badge bg-danger rounded-0 border border-dark mt-md-2 text-uppercase street-font flex-shrink-0" style="font-size: 0.68rem;">ADMIN</span>'
+                    : '<span class="badge bg-white text-dark rounded-0 border border-dark mt-md-2 text-uppercase street-font flex-shrink-0" style="font-size: 0.68rem;">USER</span>';
                 $postUserId = (int)($post['user_id_auth'] ?? 0);
             ?>
                 <div class="card post-card rounded-0" id="post-<?= (int)$post['id'] ?>">
                     <div class="row g-0">
-                        <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark p-4 text-center d-flex flex-column align-items-center">
-                            <?php if ($postUserId > 0): ?>
-                                <a href="/pages/user.php?id=<?= $postUserId ?>" title="Перейти в профиль">
-                            <?php endif; ?>
-                            <?php if ($avatar): ?>
-                                <img src="<?= e($avatar) ?>" alt="<?= e($postName) ?>" class="img-fluid rounded-circle avatar-img mb-3 shadow-sm">
-                            <?php else: ?>
-                                <div class="rounded-circle avatar-img mb-3 shadow-sm d-flex align-items-center justify-content-center bg-black text-warning fs-1 fw-black"><?= e(safeFirstChar($postName)) ?></div>
-                            <?php endif; ?>
-                            <?php if ($postUserId > 0): ?>
-                                </a>
-                            <?php endif; ?>
-
-                            <div class="street-font text-break lh-1 mb-1 fs-5">
+                        <div class="col-md-3 col-lg-2 author-col border-end-md border-bottom border-md-bottom-0 border-3 border-dark px-3 py-2 p-md-4 d-flex flex-row flex-md-column align-items-center justify-content-between justify-content-md-start gap-2 text-start text-md-center">
+                            <div class="d-flex flex-row flex-md-column align-items-center gap-2 min-w-0">
                                 <?php if ($postUserId > 0): ?>
-                                    <a href="/pages/user.php?id=<?= $postUserId ?>" class="author-link"><?= e($postName) ?></a>
-                                <?php else: ?>
-                                    <?= e($postName) ?>
+                                    <a href="/pages/user.php?id=<?= $postUserId ?>" class="avatar-link" title="Перейти в профиль">
                                 <?php endif; ?>
+                                <?php if ($avatar): ?>
+                                    <img src="<?= e($avatar) ?>" alt="<?= e($postName) ?>" class="rounded-circle avatar-img mb-md-2 shadow-sm">
+                                <?php else: ?>
+                                    <div class="rounded-circle avatar-img mb-md-2 shadow-sm d-flex align-items-center justify-content-center bg-black text-warning fw-black"><?= e(safeFirstChar($postName)) ?></div>
+                                <?php endif; ?>
+                                <?php if ($postUserId > 0): ?>
+                                    </a>
+                                <?php endif; ?>
+
+                                <div class="street-font text-break lh-sm fs-6 fs-md-5">
+                                    <?php if ($postUserId > 0): ?>
+                                        <a href="/pages/user.php?id=<?= $postUserId ?>" class="author-link"><?= e($postName) ?></a>
+                                    <?php else: ?>
+                                        <?= e($postName) ?>
+                                    <?php endif; ?>
+                                </div>
                             </div>
 
                             <?= $roleBadge ?>
 
                             <?php if (!empty($post['user_since'])): ?>
-                                <div class="mt-auto pt-3 small text-muted fw-bold font-monospace text-uppercase" style="font-size: 0.65rem;">
+                                <div class="d-none d-md-block mt-auto pt-3 small text-muted fw-bold font-monospace text-uppercase" style="font-size: 0.65rem;">
                                     REG: <?= date('d.m.y', strtotime($post['user_since'])) ?>
                                 </div>
                             <?php endif; ?>
@@ -262,7 +291,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                         <div class="col-md-9 col-lg-10 d-flex flex-column bg-white">
                             <div class="p-2 px-3 border-bottom border-2 border-dark bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                <small class="fw-bold text-muted text-uppercase street-font" style="font-size: 0.75rem;">
+                                <small class="fw-bold text-muted text-uppercase street-font" style="font-size: 0.72rem;">
                                     <i class="bi bi-clock me-1" aria-hidden="true"></i> <?= date('d.m.Y в H:i', strtotime($post['created_at'])) ?>
                                 </small>
 
@@ -291,7 +320,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
 
-                            <div class="p-4 flex-grow-1 fw-medium fs-6 text-break" style="min-height: 120px; color: #333;">
+                            <div class="p-3 p-md-4 flex-grow-1 fw-medium text-break post-message-body">
                                 <?= nl2br(e($post['content'])) ?>
                             </div>
                         </div>

@@ -26,7 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $redirectSelf = $isEdit ? '/admin/product_edit.php?id=' . $prodId : '/admin/product_edit.php';
     requireCsrfOrRedirect($redirectSelf);
 
-    // 1. Удаление фото из галереи (POST)
+    // 1. Удаление главного фото (POST)
+    if (isset($_POST['del_main_img']) && $isEdit) {
+        if (!empty($product['image'])) {
+            safeUnlinkUpload($product['image']);
+        }
+        $pdo->prepare("UPDATE products SET image = '' WHERE id = ?")->execute([$prodId]);
+        redirectWithFlash('/admin/product_edit.php?id=' . $prodId, 'Главное фото удалено.', 'info');
+    }
+
+    // 2. Удаление фото из галереи (POST)
     if (isset($_POST['del_img_id']) && $isEdit) {
         $imgId = (int)$_POST['del_img_id'];
         $fStmt = $pdo->prepare("SELECT image_path FROM product_gallery WHERE id = ? AND product_id = ? LIMIT 1");
@@ -40,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithFlash('/admin/product_edit.php?id=' . $prodId, 'Фото удалено из галереи.', 'info');
     }
 
-    // 2. Сохранение/создание товара
+    // 3. Сохранение/создание товара
     $title     = trim($_POST['title'] ?? '');
     $price     = (int)round((float)($_POST['price'] ?? 0));
     $old_price = (!empty($_POST['old_price']) && (float)$_POST['old_price'] > 0)
@@ -52,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $is_new    = isset($_POST['is_new']) ? 1 : 0;
     $is_active = isset($_POST['is_active']) ? 1 : 0;
 
-    if ($title === '' || mb_strlen($title, 'UTF-8') > 200) {
-        redirectWithFlash($redirectSelf, 'Название товара обязательно (до 200 символов).', 'danger');
+    if (mb_strlen($title, 'UTF-8') < 2 || mb_strlen($title, 'UTF-8') > 200) {
+        redirectWithFlash($redirectSelf, 'Название товара должно содержать от 2 до 200 символов.', 'danger');
     }
     if ($price < 1 || $price > 9999999) {
         redirectWithFlash($redirectSelf, 'Цена товара должна быть от 1 до 9 999 999 ₽.', 'danger');
@@ -128,11 +137,11 @@ require_once __DIR__ . '/layout_header.php';
 ?>
 
 <div class="d-flex align-items-center mb-4">
-    <a href="products.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад к товарам"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
+    <a href="/admin/products.php" class="btn btn-outline-dark rounded-0 me-3" aria-label="Назад к товарам"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
     <h2 class="fw-black text-uppercase m-0"><?= $isEdit ? 'Редактировать товар' : 'Новый товар' ?></h2>
 </div>
 
-<form method="POST" enctype="multipart/form-data">
+<form method="POST" enctype="multipart/form-data" data-validate-form data-prevent-double-submit="1" novalidate>
     <?= csrfField() ?>
     <div class="row g-4">
 
@@ -140,7 +149,8 @@ require_once __DIR__ . '/layout_header.php';
             <div class="card admin-card p-4">
                 <div class="mb-3">
                     <label for="prodTitle" class="fw-bold small text-muted mb-1">НАЗВАНИЕ</label>
-                    <input id="prodTitle" type="text" name="title" class="form-control" value="<?= $isEdit ? e($product['title']) : '' ?>" required>
+                    <input id="prodTitle" type="text" name="title" class="form-control" value="<?= $isEdit ? e($product['title']) : '' ?>" required maxlength="200" data-rule="required-text" data-min="2" data-max="200">
+                    <div class="auth-field-error"></div>
                 </div>
 
                 <div class="mb-3">
@@ -151,11 +161,13 @@ require_once __DIR__ . '/layout_header.php';
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="prodPrice" class="fw-bold small text-muted mb-1">ЦЕНА (₽, целое)</label>
-                        <input id="prodPrice" type="number" name="price" min="1" max="9999999" step="1" class="form-control" value="<?= $isEdit ? (int)$product['price'] : '' ?>" required>
+                        <input id="prodPrice" type="number" name="price" min="1" max="9999999" step="1" class="form-control" value="<?= $isEdit ? (int)$product['price'] : '' ?>" required data-rule="price" data-min="1" data-max="9999999">
+                        <div class="auth-field-error"></div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="prodOldPrice" class="fw-bold small text-muted mb-1">СТАРАЯ ЦЕНА</label>
-                        <input id="prodOldPrice" type="number" name="old_price" min="0" max="9999999" step="1" class="form-control" value="<?= ($isEdit && (int)$product['old_price'] > 0) ? (int)$product['old_price'] : '' ?>">
+                        <input id="prodOldPrice" type="number" name="old_price" min="0" max="9999999" step="1" class="form-control" value="<?= ($isEdit && (int)$product['old_price'] > 0) ? (int)$product['old_price'] : '' ?>" data-rule="price" data-optional="1" data-min="1" data-max="9999999" data-gt-field="price">
+                        <div class="auth-field-error"></div>
                     </div>
                 </div>
             </div>
@@ -195,6 +207,7 @@ require_once __DIR__ . '/layout_header.php';
                 <div class="mb-4">
                     <label for="prodCat" class="fw-bold small text-muted mb-1">КАТЕГОРИЯ</label>
                     <select id="prodCat" name="category_id" class="form-select">
+                        <option value="0">-- Без категории --</option>
                         <?php foreach ($cats as $c): ?>
                             <option value="<?= (int)$c['id'] ?>" <?= ($isEdit && (int)$product['category_id'] === (int)$c['id']) ? 'selected' : '' ?>>
                                 <?= e($c['title']) ?>
@@ -222,8 +235,16 @@ require_once __DIR__ . '/layout_header.php';
                     <label for="prodMainImg" class="fw-bold small text-muted mb-1">ГЛАВНОЕ ФОТО</label>
                     <input id="prodMainImg" type="file" name="image" class="form-control mb-2" accept="image/jpeg,image/png,image/webp,image/gif">
                     <?php if ($isEdit && !empty($product['image'])): ?>
-                        <div class="border border-dark p-1">
+                        <div class="position-relative border border-dark p-1">
                             <img src="<?= e($product['image']) ?>" alt="<?= e($product['title']) ?>" class="w-100">
+                            <button type="submit"
+                                    form="delMainImgForm"
+                                    class="btn btn-sm btn-danger position-absolute top-0 end-0 rounded-0"
+                                    title="Удалить главное фото"
+                                    aria-label="Удалить главное фото"
+                                    onclick="return confirm('Удалить главное фото товара?');">
+                                <i class="bi bi-trash" aria-hidden="true"></i>
+                            </button>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -235,6 +256,13 @@ require_once __DIR__ . '/layout_header.php';
         </div>
     </div>
 </form>
+
+<?php if ($isEdit && !empty($product['image'])): ?>
+    <form method="POST" id="delMainImgForm" class="d-none">
+        <?= csrfField() ?>
+        <input type="hidden" name="del_main_img" value="1">
+    </form>
+<?php endif; ?>
 
 <?php if ($isEdit && !empty($gallery)): ?>
     <?php foreach ($gallery as $img): ?>
